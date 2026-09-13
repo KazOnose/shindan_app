@@ -167,6 +167,12 @@ CUSTOM_CSS = f"""
         padding: var(--space-md) 0 0 0;
         margin: 0 0 var(--space-sm) 0;
     }}
+    .stMarkdown h5 .shindan-heading-note {{
+        font-size: var(--text-sm);      /* 14px。補足情報なので小さく */
+        font-weight: 500;
+        color: var(--color-text-muted);
+        margin-left: var(--space-xs);
+    }}
     .stMarkdown p, .stRadio label p {{
         font-size: var(--text-md);
         line-height: 1.75;
@@ -509,13 +515,14 @@ SIDEBAR_INDUSTRY_TITLE = "業種"
 SIDEBAR_EMPLOYEE_TITLE = "従業員数"
 SIDEBAR_TROUBLE_TITLE = "いちばんの困りごと"
 SIDEBAR_MATERIAL_TITLE = "社内にある材料"
-SIDEBAR_NOTE_TITLE = "補足（任意。「その他」を選んだ場合は困りごとをここに書いてください）"
+SIDEBAR_NOTE_TITLE = "補足（※任意。「その他」を選んだ場合は困りごとをここに書いてください）"
 # サイドバーの番号付き見出し（入力欄を5つの区切りに分ける）
 SIDEBAR_SECTION_AREA = "1. 相談したい領域"
 SIDEBAR_SECTION_COMPANY = "2. 御社について"
 SIDEBAR_SECTION_TROUBLE = "3. いちばんの困りごと"
 SIDEBAR_SECTION_MATERIAL = "4. 社内にある材料"
-SIDEBAR_SECTION_NOTE = "5. 補足（任意。「その他」を選んだ場合は困りごとをここに書いてください）"
+SIDEBAR_SECTION_NOTE = "5. 補足"
+SIDEBAR_SECTION_NOTE_SUB = "（※任意。「その他」を選んだ場合は困りごとをここに書いてください）"
 SIDEBAR_NOTE_PLACEHOLDER = "例: 今の状況や、すでに試したことがあれば書いてください"
 DIAGNOSIS_BUTTON_LABEL = "診断する"
 

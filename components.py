@@ -125,7 +125,10 @@ def display_diagnosis_form():
             st.write("")
 
             # 5. 補足（自由記述・任意）
-            st.markdown(f"##### {ct.SIDEBAR_SECTION_NOTE}")
+            st.markdown(
+                f'##### {ct.SIDEBAR_SECTION_NOTE} <span class="shindan-heading-note">{ct.SIDEBAR_SECTION_NOTE_SUB}</span>',
+                unsafe_allow_html=True,
+            )
             st.caption(ct.SIDEBAR_SECTION_NOTE_HELP)
             note = st.text_input(
                 label=ct.SIDEBAR_NOTE_TITLE,
