@@ -148,7 +148,7 @@ CUSTOM_CSS = f"""
     input, textarea, button, select {{
         font-family: var(--font-body);
     }}
-    /* 画面の地: 紺のグラデーション。点の網目を最前面に、その下に放射グラデ、最下層に線形グラデを重ねる */
+    /* 画面の地: 紺のグラデーション。点の網目・放射グラデ・線形グラデを静止したまま重ねる */
     .stApp {{
         background-color: var(--color-page-bg);
         background-image:
@@ -156,62 +156,29 @@ CUSTOM_CSS = f"""
             radial-gradient(at 78% 20%, rgba(31,56,100,0.55), rgba(0,0,0,0) 60%),
             linear-gradient(168deg, #141d35 0%, #0a0f1c 76%);
         background-size: 28px 28px, auto, auto;
-        background-position: 0 0, 0 0, 0 0;
         background-attachment: fixed;
         color: var(--color-text);
-        animation: shindan-bg-dots-drift 60s linear infinite;
     }}
-    /* 背景の動き1: ぼかした光の玉を2つ、ゆっくり往復させる */
-    .stApp::before {{
-        content: "";
+    /* 背景の動きは components.display_background_canvas() が描くcanvas（iframe）が担う。
+       iframeを全画面に固定し、本文の背面へ置き、クリックは本文へ通す */
+    [data-testid="stIFrame"] iframe, iframe[title="st.iframe"] {{
         position: fixed;
         inset: 0;
+        width: 100vw;
+        height: 100vh;
         z-index: 0;
         pointer-events: none;
-        background-image:
-            radial-gradient(circle, rgba(31,56,100,0.6), rgba(31,56,100,0) 70%),
-            radial-gradient(circle, rgba(80,110,170,0.35), rgba(80,110,170,0) 70%);
-        background-repeat: no-repeat, no-repeat;
-        background-size: 40vw 40vw, 42vw 42vw;
-        background-position: 12% 18%, 82% 72%;
-        filter: blur(60px);
-        animation: shindan-bg-glow-move 30s ease-in-out infinite alternate;
+        border: 0;
     }}
-    /* 背景の動き2: 細い線の六角形（頂点に小さな円）を右上寄りにゆっくり回転させる */
-    .stApp::after {{
-        content: "";
-        position: fixed;
-        top: -20vw;
-        right: -15vw;
-        width: 60vw;
-        height: 60vw;
-        z-index: 0;
-        pointer-events: none;
-        background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20200%20200'%3E%3Cpolygon%20points='190,100%20145,178%2055,178%2010,100%2055,22%20145,22'%20fill='none'%20stroke='rgba(255,255,255,0.12)'%20stroke-width='1'/%3E%3Ccircle%20cx='190'%20cy='100'%20r='3'%20fill='rgba(255,255,255,0.12)'/%3E%3Ccircle%20cx='145'%20cy='178'%20r='3'%20fill='rgba(255,255,255,0.12)'/%3E%3Ccircle%20cx='55'%20cy='178'%20r='3'%20fill='rgba(255,255,255,0.12)'/%3E%3Ccircle%20cx='10'%20cy='100'%20r='3'%20fill='rgba(255,255,255,0.12)'/%3E%3Ccircle%20cx='55'%20cy='22'%20r='3'%20fill='rgba(255,255,255,0.12)'/%3E%3Ccircle%20cx='145'%20cy='22'%20r='3'%20fill='rgba(255,255,255,0.12)'/%3E%3C/svg%3E");
-        background-size: contain;
-        background-repeat: no-repeat;
-        animation: shindan-bg-hex-rotate 90s linear infinite;
-    }}
-    @keyframes shindan-bg-dots-drift {{
-        0% {{ background-position: 0 0, 0 0, 0 0; }}
-        100% {{ background-position: 28px 28px, 0 0, 0 0; }}
-    }}
-    @keyframes shindan-bg-glow-move {{
-        0% {{ transform: translate(0, 0); }}
-        50% {{ transform: translate(3vw, -2vw); }}
-        100% {{ transform: translate(-2vw, 3vw); }}
-    }}
-    @keyframes shindan-bg-hex-rotate {{
-        from {{ transform: rotate(0deg); }}
-        to {{ transform: rotate(360deg); }}
-    }}
-    @media (prefers-reduced-motion: reduce) {{
-        .stApp {{
-            animation: none;
-        }}
-        .stApp::before, .stApp::after {{
-            animation: none;
-        }}
+    /* iframeを包む要素は高さを持たせず、本文に空白を作らない */
+    [data-testid="stIFrame"],
+    [data-testid="stElementContainer"]:has([data-testid="stIFrame"]),
+    [data-testid="stElementContainer"]:has(iframe[title="st.iframe"]) {{
+        height: 0;
+        min-height: 0;
+        margin: 0;
+        padding: 0;
+        overflow: visible;
     }}
     ::selection {{
         background: var(--color-primary);
@@ -698,6 +665,137 @@ CUSTOM_CSS = f"""
     }}
 </style>
 """
+
+# 背景の動き: 球面に散らした点をゆっくり回す canvas（components.display_background_canvas で描画）
+# ・外部ライブラリは使わず、素の <canvas> と <script> だけで完結させる
+# ・JSの {} をエスケープせずに済むよう、この定数は f-string にしない（値はJS側の const に直書きする）
+BACKGROUND_CANVAS_HTML = """
+<style>
+    html, body { margin: 0; background: transparent; overflow: hidden; }
+    canvas { display: block; width: 100vw; height: 100vh; }
+</style>
+<canvas id="shindan-bg-sphere"></canvas>
+<script>
+(function () {
+    // --- 調整用の値 ---
+    var POINT_COUNT = 220;          // 球面に散らす点の数
+    var ROTATION_SECONDS = 60;      // Y軸まわりに1周する秒数
+    var CENTER_X_RATIO = 0.72;      // 球の中心（画面幅に対する割合）
+    var CENTER_Y_RATIO = 0.45;      // 球の中心（画面高さに対する割合）
+    var RADIUS_RATIO = 0.38;        // 半径（画面の短辺に対する割合）
+    var CAMERA_FACTOR = 3;          // 視点距離 = 半径 * この値
+    var LINK_DISTANCE = 60;         // 点と点を線で結ぶ投影距離の上限(px)
+    var RADIUS_NEAR = 2;            // 手前の点の半径(px)
+    var RADIUS_FAR = 0.6;           // 奥の点の半径(px)
+    var ALPHA_NEAR = 0.9;           // 手前の点の不透明度
+    var ALPHA_FAR = 0.15;           // 奥の点の不透明度
+
+    var canvas = document.getElementById('shindan-bg-sphere');
+    var ctx = canvas.getContext('2d');
+
+    // 球面上に一様分布で点を置く
+    var points = [];
+    for (var i = 0; i < POINT_COUNT; i++) {
+        var z = 2 * Math.random() - 1;
+        var theta = 2 * Math.PI * Math.random();
+        var r = Math.sqrt(1 - z * z);
+        points.push({ x: r * Math.cos(theta), y: r * Math.sin(theta), z: z });
+    }
+
+    var width = 0, height = 0, centerX = 0, centerY = 0, radius = 0, camera = 0;
+
+    function resize() {
+        var dpr = window.devicePixelRatio || 1;
+        width = window.innerWidth;
+        height = window.innerHeight;
+        canvas.width = Math.round(width * dpr);
+        canvas.height = Math.round(height * dpr);
+        canvas.style.width = width + 'px';
+        canvas.style.height = height + 'px';
+        ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+        centerX = width * CENTER_X_RATIO;
+        centerY = height * CENTER_Y_RATIO;
+        radius = Math.min(width, height) * RADIUS_RATIO;
+        camera = radius * CAMERA_FACTOR;
+    }
+
+    var projected = new Array(POINT_COUNT);
+    for (var j = 0; j < POINT_COUNT; j++) {
+        projected[j] = { x: 0, y: 0, depth: 0 };
+    }
+
+    function draw(elapsedMs) {
+        var angle = (elapsedMs / 1000) * (2 * Math.PI / ROTATION_SECONDS);
+        var cos = Math.cos(angle);
+        var sin = Math.sin(angle);
+        ctx.clearRect(0, 0, width, height);
+
+        for (var i = 0; i < POINT_COUNT; i++) {
+            var p = points[i];
+            // Y軸まわりの回転
+            var rx = p.x * cos + p.z * sin;
+            var rz = -p.x * sin + p.z * cos;
+            var ry = p.y;
+            // 透視投影
+            var scale = camera / (camera + rz * radius);
+            var q = projected[i];
+            q.x = centerX + rx * radius * scale;
+            q.y = centerY + ry * radius * scale;
+            // depth: 奥=0, 手前=1
+            q.depth = (1 - rz) / 2;
+        }
+
+        // 近い点どうしを線で結ぶ（距離の判定は平方距離で行う）
+        var limitSq = LINK_DISTANCE * LINK_DISTANCE;
+        ctx.lineWidth = 0.6;
+        ctx.strokeStyle = 'rgba(160,190,240,0.25)';
+        ctx.beginPath();
+        for (var a = 0; a < POINT_COUNT; a++) {
+            for (var b = a + 1; b < POINT_COUNT; b++) {
+                var dx = projected[a].x - projected[b].x;
+                var dy = projected[a].y - projected[b].y;
+                if (dx * dx + dy * dy < limitSq) {
+                    ctx.moveTo(projected[a].x, projected[a].y);
+                    ctx.lineTo(projected[b].x, projected[b].y);
+                }
+            }
+        }
+        ctx.stroke();
+
+        // 点は奥ほど小さく薄く
+        for (var k = 0; k < POINT_COUNT; k++) {
+            var pt = projected[k];
+            var dotRadius = RADIUS_FAR + (RADIUS_NEAR - RADIUS_FAR) * pt.depth;
+            var alpha = ALPHA_FAR + (ALPHA_NEAR - ALPHA_FAR) * pt.depth;
+            ctx.fillStyle = 'rgba(200,220,255,' + alpha.toFixed(3) + ')';
+            ctx.beginPath();
+            ctx.arc(pt.x, pt.y, dotRadius, 0, 2 * Math.PI);
+            ctx.fill();
+        }
+    }
+
+    var reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+    resize();
+    if (reduceMotion) {
+        // 動きを減らす設定のときは1フレームだけ描いて止める
+        draw(0);
+        window.addEventListener('resize', function () { resize(); draw(0); });
+        return;
+    }
+
+    var start = null;
+    function frame(now) {
+        if (start === null) { start = now; }
+        draw(now - start);
+        window.requestAnimationFrame(frame);
+    }
+    window.addEventListener('resize', resize);
+    window.requestAnimationFrame(frame);
+})();
+</script>
+"""
+
 
 # 結果が出た瞬間の一回きりの登場CSS（診断直後の描画でだけ st.markdown で出す。詳細は README「1.」を参照）
 # ・下から8px上がりながら不透明度0→1で360ms、cubic-bezier(0.22, 1, 0.36, 1)（ease-out）

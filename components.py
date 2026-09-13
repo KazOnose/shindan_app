@@ -8,6 +8,7 @@
 import html
 import urllib.parse
 import streamlit as st
+import streamlit.components.v1 as components
 import utils
 import constants as ct
 
@@ -23,6 +24,17 @@ def apply_custom_style():
     Cleanデザイン指針に沿ったトークン（constants.CUSTOM_CSS）を、画面の先頭で1回だけ読み込む。
     """
     st.markdown(ct.CUSTOM_CSS, unsafe_allow_html=True)
+
+
+def display_background_canvas():
+    """
+    背景の動き（球面に散らした点をゆっくり回すcanvas）を表示
+
+    constants.BACKGROUND_CANVAS_HTMLをiframeとして埋め込む。iframeは
+    CUSTOM_CSS側で全画面固定・本文の背面・クリック透過にしてあるため、
+    ここでの高さは本文に空白を作らない最小値（1）を指定する。
+    """
+    components.html(ct.BACKGROUND_CANVAS_HTML, height=1, scrolling=False)
 
 
 def display_app_title():

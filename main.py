@@ -46,6 +46,9 @@ logger = logging.getLogger(ct.LOGGER_NAME)
 # （初期化処理には時間がかかるため、タイトルと1行の説明を先に描いてから初期化を行う）
 cn.apply_custom_style()
 
+# 背景の動き（点の球のcanvas）を表示
+cn.display_background_canvas()
+
 # タイトル表示
 cn.display_app_title()
 
