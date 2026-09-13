@@ -706,7 +706,7 @@ CUSTOM_CSS = f"""
 """
 
 # 背景の点の球（canvasアニメーション）を出すかどうか。False なら canvas を描画しない（iframe も作られない）
-SHOW_BACKGROUND_ANIMATION = False
+SHOW_BACKGROUND_ANIMATION = True
 
 # 背景の動き: 球面に散らした点をゆっくり回す canvas（components.display_background_canvas で描画）
 # ・外部ライブラリは使わず、素の <canvas> と <script> だけで完結させる
@@ -721,12 +721,14 @@ BACKGROUND_CANVAS_HTML = """
 (function () {
     // --- 調整用の値 ---
     var POINT_COUNT = 380;          // 球面に散らす点の数
-    var ROTATION_SECONDS = 60;      // Y軸まわりに1周する秒数
+    var ROTATION_SECONDS = 3600;      // Y軸まわりに1周する秒数
     var CENTER_X_RATIO = 0.5;       // 球の中心（画面幅に対する割合）
     var CENTER_Y_RATIO = 0.5;       // 球の中心（画面高さに対する割合）
-    var RADIUS_RATIO = 0.55;        // 半径（画面の長辺に対する割合）
+    var RADIUS_RATIO = 0.65;        // 半径（画面の長辺に対する割合）
     var CAMERA_FACTOR = 3;          // 視点距離 = 半径 * この値
-    var LINK_DISTANCE = 80;         // 点と点を線で結ぶ投影距離の上限(px)
+    var LINK_DISTANCE = 100;         // 点と点を線で結ぶ投影距離の上限(px)
+    var REFERENCE_LONG_SIDE = 730;  // 上の値を決めたときの画面の長辺(px)。画面がこれより広いぶんだけ点を増やし、見え方の密度を保つ
+    var MAX_POINT_COUNT = 2000;     // 広い画面で増やす点の数の上限（描画負荷の抑え）
     var RADIUS_NEAR = 2;            // 手前の点の半径(px)
     var RADIUS_FAR = 0.6;           // 奥の点の半径(px)
     var ALPHA_NEAR = 0.9;           // 手前の点の不透明度
@@ -737,7 +739,7 @@ BACKGROUND_CANVAS_HTML = """
 
     // 球面上に一様分布で点を置く
     var points = [];
-    for (var i = 0; i < POINT_COUNT; i++) {
+    for (var i = 0; i < MAX_POINT_COUNT; i++) {
         var z = 2 * Math.random() - 1;
         var theta = 2 * Math.PI * Math.random();
         var r = Math.sqrt(1 - z * z);
@@ -745,6 +747,7 @@ BACKGROUND_CANVAS_HTML = """
     }
 
     var width = 0, height = 0, centerX = 0, centerY = 0, radius = 0, camera = 0;
+    var activeCount = POINT_COUNT;
 
     function resize() {
         var dpr = window.devicePixelRatio || 1;
@@ -759,10 +762,13 @@ BACKGROUND_CANVAS_HTML = """
         centerY = height * CENTER_Y_RATIO;
         radius = Math.max(width, height) * RADIUS_RATIO;
         camera = radius * CAMERA_FACTOR;
+        // 画面が基準より広いぶん、点の数を面積比で増やす（狭い画面では減らさない）。線の距離(px)はそのまま
+        var sizeScale = Math.max(1, Math.max(width, height) / REFERENCE_LONG_SIDE);
+        activeCount = Math.min(MAX_POINT_COUNT, Math.round(POINT_COUNT * sizeScale * sizeScale));
     }
 
-    var projected = new Array(POINT_COUNT);
-    for (var j = 0; j < POINT_COUNT; j++) {
+    var projected = new Array(MAX_POINT_COUNT);
+    for (var j = 0; j < MAX_POINT_COUNT; j++) {
         projected[j] = { x: 0, y: 0, depth: 0 };
     }
 
@@ -772,7 +778,7 @@ BACKGROUND_CANVAS_HTML = """
         var sin = Math.sin(angle);
         ctx.clearRect(0, 0, width, height);
 
-        for (var i = 0; i < POINT_COUNT; i++) {
+        for (var i = 0; i < activeCount; i++) {
             var p = points[i];
             // Y軸まわりの回転
             var rx = p.x * cos + p.z * sin;
@@ -790,10 +796,10 @@ BACKGROUND_CANVAS_HTML = """
         // 近い点どうしを線で結ぶ（距離の判定は平方距離で行う）
         var limitSq = LINK_DISTANCE * LINK_DISTANCE;
         ctx.lineWidth = 0.6;
-        ctx.strokeStyle = 'rgba(160,190,240,0.18)';
+        ctx.strokeStyle = 'rgba(160,190,240,0.22)';
         ctx.beginPath();
-        for (var a = 0; a < POINT_COUNT; a++) {
-            for (var b = a + 1; b < POINT_COUNT; b++) {
+        for (var a = 0; a < activeCount; a++) {
+            for (var b = a + 1; b < activeCount; b++) {
                 var dx = projected[a].x - projected[b].x;
                 var dy = projected[a].y - projected[b].y;
                 if (dx * dx + dy * dy < limitSq) {
@@ -805,7 +811,7 @@ BACKGROUND_CANVAS_HTML = """
         ctx.stroke();
 
         // 点は奥ほど小さく薄く
-        for (var k = 0; k < POINT_COUNT; k++) {
+        for (var k = 0; k < activeCount; k++) {
             var pt = projected[k];
             var dotRadius = RADIUS_FAR + (RADIUS_NEAR - RADIUS_FAR) * pt.depth;
             var alpha = ALPHA_FAR + (ALPHA_NEAR - ALPHA_FAR) * pt.depth;
