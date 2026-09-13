@@ -6,6 +6,7 @@
 # ライブラリの読み込み
 ############################################################
 import html
+import urllib.parse
 import streamlit as st
 import utils
 import constants as ct
@@ -277,7 +278,7 @@ def display_results():
 
 def display_consult_message():
     """
-    相談導線の文言（ct.CONSULT_MESSAGE）を、画面全体で一番下に1回だけ表示
+    相談導線の文言（ct.CONSULT_MESSAGE_FORMAT。「ご相談」はmailtoリンク）を、画面全体で一番下に1回だけ表示
 
     診断結果が1件以上あるときだけ表示する（診断前は何も出さない）。表示する位置は
     「追加質問の欄」の直後・「資料検索（管理者用）」の直前で、診断ごとには出さない。
@@ -285,7 +286,10 @@ def display_consult_message():
     # 診断前は相談案内を出さない
     if not has_diagnosis_result():
         return
-    st.info(ct.CONSULT_MESSAGE)
+    # 件名をURLエンコードしてmailto URLを組み立てる（st.infoはMarkdownのリンクを解釈する）
+    encoded_subject = urllib.parse.quote(ct.CONSULT_MAIL_SUBJECT)
+    mailto = f"mailto:{ct.CONSULT_MAIL_ADDRESS}?subject={encoded_subject}"
+    st.info(ct.CONSULT_MESSAGE_FORMAT.format(mailto=mailto))
 
 
 def display_follow_up_form():
