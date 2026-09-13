@@ -515,7 +515,7 @@ def initialize_retriever():
     # 読み込みの進み具合を表示する場所を用意し、その中に進捗バーを置く
     # （準備が終わったら「progress_box.empty()」でまとめて消す）
     progress_box = st.empty()
-    progress_bar = progress_box.progress(0, text=ct.LOADING_SPINNER_TEXT)
+    progress_bar = progress_box.progress(0)
 
     # RAGの参照先となるデータソースの読み込み（フォルダを1つ読み終えるたびに進捗バーが進む）
     docs_all = load_data_sources(progress_bar)
@@ -552,13 +552,13 @@ def initialize_retriever():
     splitted_docs.extend(no_split_docs)
 
     # 資料の読み込みが終わり、ここからは時間のかかるベクトル化（最後の1区間）に入る
-    progress_bar.progress(ct.LOADING_PROGRESS_EMBED_VALUE, text=ct.LOADING_PROGRESS_EMBED_TEXT)
+    progress_bar.progress(ct.LOADING_PROGRESS_EMBED_VALUE)
 
     # ベクターストアの作成
     db = Chroma.from_documents(splitted_docs, embedding=embeddings)
 
     # 準備が終わったことを表示し、進捗バーごと画面から消す
-    progress_bar.progress(100, text=ct.LOADING_PROGRESS_DONE_TEXT)
+    progress_bar.progress(100)
     progress_box.empty()
 
     # 診断時にパターン文書だけへ絞り込んだRetrieverを作れるよう、ベクターストアを保持しておく
@@ -621,10 +621,7 @@ def load_data_sources(progress_bar=None):
             recursive_file_check(full_path, docs_all)
             loaded_count += 1
             if progress_bar is not None:
-                progress_bar.progress(
-                    int(loaded_count / folder_total * 100),
-                    text=ct.LOADING_PROGRESS_FOLDER_TEXT.format(folder=name)
-                )
+                progress_bar.progress(int(loaded_count / folder_total * 100))
         else:
             # 直下にファイルが置かれている場合は、従来どおりそのまま読み込む
             file_load(full_path, docs_all)
