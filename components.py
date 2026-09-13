@@ -307,14 +307,22 @@ def display_follow_up_form():
     # 結果と質問欄の間に余白を置く
     st.write("")
 
-    # 送信のたびに入力欄を空へ戻すフォーム
-    with st.form(key=ct.FOLLOW_UP_FORM_KEY, clear_on_submit=True):
-        follow_up_text = st.text_input(
-            label=ct.FOLLOW_UP_INPUT_LABEL,
-            key=ct.FOLLOW_UP_INPUT_KEY,
-            placeholder=ct.CHAT_INPUT_HELPER_TEXT
-        )
-        submitted = st.form_submit_button(ct.FOLLOW_UP_BUTTON_LABEL)
+    # 入力フォームと同じ白いカード（余白・角丸・影）で包む
+    with st.container(border=True):
+        st.markdown(f"##### {ct.FOLLOW_UP_CARD_TITLE}")
+        # 送信のたびに入力欄を空へ戻すフォーム
+        with st.form(key=ct.FOLLOW_UP_FORM_KEY, clear_on_submit=True):
+            follow_up_text = st.text_input(
+                label=ct.FOLLOW_UP_INPUT_LABEL,
+                key=ct.FOLLOW_UP_INPUT_KEY,
+                placeholder=ct.FOLLOW_UP_INPUT_PLACEHOLDER,
+                label_visibility="collapsed"
+            )
+            submitted = st.form_submit_button(
+                ct.FOLLOW_UP_BUTTON_LABEL,
+                type="primary",
+                use_container_width=True
+            )
 
     return submitted, follow_up_text
 
