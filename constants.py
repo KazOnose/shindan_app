@@ -94,6 +94,7 @@ CUSTOM_CSS = f"""
         --text-lg: 18px;
         --text-xl: 22px;
         --text-2xl: 32px;
+        --text-question: 19px;
         /* 余白: 4ptスケール */
         --space-xs: 4px;
         --space-sm: 8px;
@@ -158,10 +159,10 @@ CUSTOM_CSS = f"""
         margin: 0;
     }}
     .stMarkdown h5 {{
-        font-size: var(--text-md);
+        font-size: var(--text-question);
         font-weight: 700;
         color: var(--color-text);
-        padding: var(--space-xs) 0 0 0;
+        padding: var(--space-md) 0 0 0;
         margin: 0 0 var(--space-xs) 0;
     }}
     .stMarkdown p, .stRadio label p {{
@@ -513,7 +514,7 @@ SIDEBAR_SECTION_COMPANY = "2. 御社について"
 SIDEBAR_SECTION_TROUBLE = "3. いちばんの困りごと"
 SIDEBAR_SECTION_MATERIAL = "4. 社内にある材料"
 SIDEBAR_SECTION_NOTE = "5. 補足（任意。「その他」を選んだ場合は困りごとをここに書いてください）"
-SIDEBAR_NOTE_PLACEHOLDER = "例: ハローワークにしか出していない"
+SIDEBAR_NOTE_PLACEHOLDER = "例: 今の状況や、すでに試したことがあれば書いてください"
 DIAGNOSIS_BUTTON_LABEL = "診断する"
 
 SIDEBAR_MODE_2_TITLE = "**【「パターン検索」を選択した場合】**"
