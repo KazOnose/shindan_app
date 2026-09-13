@@ -47,7 +47,9 @@ logger = logging.getLogger(ct.LOGGER_NAME)
 cn.apply_custom_style()
 
 # 背景の動き（点の球のcanvas）を表示
-cn.display_background_canvas()
+# 背景の点の球は SHOW_BACKGROUND_ANIMATION で切り替え
+if ct.SHOW_BACKGROUND_ANIMATION:
+    cn.display_background_canvas()
 
 # タイトル表示
 cn.display_app_title()
