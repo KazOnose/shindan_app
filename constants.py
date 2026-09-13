@@ -59,8 +59,8 @@ LOADING_PROGRESS_EMBED_VALUE = 90
 # hallmark audit（2026-09-13）の指摘に沿い、色・余白・角丸・影はCSSカスタムプロパティ（:root）に集約し、
 # グラデーションと重ね影を廃止、余白は4ptスケール、状態（hover/active/disabled/focus）を明示する。
 STYLE_FONT_FAMILY = "'Zen Kaku Gothic New', 'Hiragino Kaku Gothic ProN', 'Yu Gothic', 'Meiryo', sans-serif"
-STYLE_FONT_IMPORT_URL = "https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@500;700&display=swap"
-STYLE_COLOR_PRIMARY = "#1F3A5F"       # 紺: 主役の面、主ボタン、選択中
+STYLE_FONT_IMPORT_URL = "https://fonts.googleapis.com/css2?family=Zen+Kaku+Gothic+New:wght@400;500;700&display=swap"
+STYLE_COLOR_PRIMARY = "#1f3864"       # 紺: 主役の面、主ボタン、選択中
 STYLE_COLOR_PRIMARY_DEEP = "#16294A"  # 紺（濃）: 押下中（:active）
 STYLE_COLOR_ACCENT = "#B45309"        # 琥珀: 「次の一歩」の見出しだけに使う
 STYLE_COLOR_TEXT = "#1A1A1A"
@@ -71,6 +71,13 @@ STYLE_COLOR_CANVAS = "#F5F7FA"        # 画面の地
 STYLE_COLOR_SURFACE = "#FFFFFF"       # 面（フォーム・結果の各ブロック）
 STYLE_COLOR_LINE = "#D9DFE7"          # 罫線
 STYLE_COLOR_LINE_ON_PRIMARY = "#3D567A"  # 紺の面の上の罫線
+# 画面の地を紺のグラデーションにしたため、「カードの外（紺の上）」に描かれる要素用の配色を持つ
+STYLE_COLOR_PAGE_BG = "#0a0f1c"              # 画面の地（最下層のベタ色）
+STYLE_COLOR_TEXT_ON_PAGE = "#ffffff"         # 紺の上の見出し・本文
+STYLE_COLOR_TEXT_ON_PAGE_SOFT = "rgba(255,255,255,0.75)"  # 紺の上の補助文字（説明文・caption）
+STYLE_COLOR_OVERLAY_SURFACE = "rgba(255,255,255,0.08)"    # 紺の上に置く半透明の面（通知枠・折りたたみ・吹き出し）
+STYLE_COLOR_OVERLAY_LINE = "rgba(255,255,255,0.18)"       # 同じ面の枠線・区切り線
+STYLE_COLOR_OVERLAY_LINE_STRONG = "rgba(255,255,255,0.35)"  # 紺の面・主ボタンを地から切り離す枠線
 STYLE_CONTENT_MAX_WIDTH = "960px"
 # 画面全体に適用するCSS（色・余白・角丸・影は :root のトークンで定義し、以降は var() で参照する）
 CUSTOM_CSS = f"""
@@ -89,6 +96,13 @@ CUSTOM_CSS = f"""
         --color-surface: {STYLE_COLOR_SURFACE};
         --color-line: {STYLE_COLOR_LINE};
         --color-line-on-primary: {STYLE_COLOR_LINE_ON_PRIMARY};
+        /* 画面の地（紺）の上に描かれる要素用 */
+        --color-page-bg: {STYLE_COLOR_PAGE_BG};
+        --color-text-on-page: {STYLE_COLOR_TEXT_ON_PAGE};
+        --color-text-on-page-soft: {STYLE_COLOR_TEXT_ON_PAGE_SOFT};
+        --color-overlay-surface: {STYLE_COLOR_OVERLAY_SURFACE};
+        --color-overlay-line: {STYLE_COLOR_OVERLAY_LINE};
+        --color-overlay-line-strong: {STYLE_COLOR_OVERLAY_LINE_STRONG};
         --font-body: {STYLE_FONT_FAMILY};
         /* 文字サイズ: 14 / 16 / 18 / 22 / 32 */
         --text-sm: 14px;
@@ -108,8 +122,8 @@ CUSTOM_CSS = f"""
         --radius-surface: 12px;
         --radius-control: 8px;
         --radius-pill: 999px;
-        /* 影は1段階だけ（入力フォームの面のみ） */
-        --shadow-surface: 0 8px 24px rgba(31, 58, 95, 0.08);
+        /* 影は1段階だけ（白いカードと診断結果の面）。紺の地の上で浮かせるため濃くする */
+        --shadow-surface: 0 8px 24px rgba(0, 0, 0, 0.35);
         /* 操作部品の高さは44pxで統一 */
         --control-height: 44px;
         --focus-ring-inner: 0 0 0 2px var(--color-surface);
@@ -123,12 +137,19 @@ CUSTOM_CSS = f"""
 
     /* 書体: 1ファミリー。アイコンフォントは巻き込まない */
     html, body, .stApp, .stMarkdown, .stCaption, .stRadio, .stSelectbox, .stMultiSelect,
-    .stTextInput, .stButton, .stFormSubmitButton, .stExpander, .stAlert,
+    .stTextInput, .stButton, .stFormSubmitButton, .stExpander, .stAlert, .stChatMessage,
     input, textarea, button, select {{
         font-family: var(--font-body);
     }}
+    /* 画面の地: 紺のグラデーション。点の網目を最前面に、その下に放射グラデ、最下層に線形グラデを重ねる */
     .stApp {{
-        background-color: var(--color-canvas);
+        background-color: var(--color-page-bg);
+        background-image:
+            radial-gradient(rgba(255,255,255,0.06) 1px, transparent 1px),
+            radial-gradient(at 78% 20%, rgba(31,56,100,0.55), rgba(0,0,0,0) 60%),
+            linear-gradient(168deg, #141d35 0%, #0a0f1c 76%);
+        background-size: 28px 28px, auto, auto;
+        background-attachment: fixed;
         color: var(--color-text);
     }}
     ::selection {{
@@ -149,14 +170,14 @@ CUSTOM_CSS = f"""
         font-weight: 700;
         line-height: 1.3;
         letter-spacing: -0.01em;
-        color: var(--color-primary);
+        color: var(--color-text-on-page);
         padding: 0;
         margin: 0 0 var(--space-xs) 0;
     }}
     .stMarkdown h3 {{
         font-size: var(--text-xl);
         font-weight: 700;
-        color: var(--color-primary);
+        color: var(--color-text-on-page);
         padding: var(--space-sm) 0 0 0;
         margin: 0;
     }}
@@ -178,15 +199,20 @@ CUSTOM_CSS = f"""
         line-height: 1.75;
         color: var(--color-text);
     }}
+    /* カードの外（紺の上）のcaption（「最新の診断」「過去の診断（N回目）」「入力内容の1行要約」）は白系 */
     [data-testid="stCaptionContainer"] p {{
-        color: var(--color-text-muted);
+        color: var(--color-text-on-page-soft);
         font-size: var(--text-sm);
         line-height: 1.6;
+    }}
+    /* カードの中のcaption（設問の説明文「1つ選ぶと…」など）は今の色に戻す */
+    [data-testid="stVerticalBlockBorderWrapper"]:not(.st-emotion-cache-0) [data-testid="stCaptionContainer"] p {{
+        color: var(--color-text-muted);
     }}
     /* タイトル直下の一文は説明ではなく見出しの続き */
     .shindan-lead p {{
         font-size: var(--text-lg);
-        color: var(--color-text-muted);
+        color: var(--color-text-on-page-soft);
         margin: 0;
     }}
 
@@ -257,7 +283,7 @@ CUSTOM_CSS = f"""
     }}
     .stFormSubmitButton button[kind="primary"] {{
         background: var(--color-primary);
-        border: 0;
+        border: 1px solid var(--color-overlay-line-strong);
         color: var(--color-text-on-primary);
     }}
     .stFormSubmitButton button[kind="primary"]:hover {{
@@ -285,17 +311,19 @@ CUSTOM_CSS = f"""
         box-shadow: var(--focus-ring-inner), var(--focus-ring-outer);
     }}
 
-    /* 診断結果のブロック: 白い面を1pxの罫線で区切る（影なし）。該当パターンだけ紺の面 */
+    /* 診断結果のブロック: 白い面を1pxの罫線で区切る。紺の地の上では影で浮かせる。該当パターンだけ紺の面 */
     .shindan-panel {{
         background: var(--color-surface);
         border: 1px solid var(--color-line);
         border-radius: var(--radius-surface);
+        box-shadow: var(--shadow-surface);
         padding: var(--space-md) var(--space-lg);
         margin: 0 0 var(--space-md) 0;
     }}
+    /* 紺の面は地と同化するため、白い枠線で切り離す */
     .shindan-panel.shindan-hero {{
         background: var(--color-primary);
-        border-color: var(--color-primary);
+        border: 1px solid var(--color-overlay-line-strong);
         color: var(--color-text-on-primary);
         padding: var(--space-lg) var(--space-xl);
         margin-bottom: var(--space-lg);
@@ -370,20 +398,121 @@ CUSTOM_CSS = f"""
         }}
     }}
 
-    /* 通知枠・区切り線・折りたたみ */
+    /* 通知枠・区切り線・折りたたみ（いずれもカードの外＝紺の上に描かれるため、半透明の面＋白い文字にする） */
     [data-testid="stAlert"] {{
         border-radius: var(--radius-control);
+        background: var(--color-overlay-surface);
+        border: 1px solid var(--color-overlay-line);
+        color: var(--color-text-on-page);
+    }}
+    [data-testid="stAlert"] p,
+    [data-testid="stAlert"] li,
+    [data-testid="stAlert"] strong,
+    [data-testid="stAlert"] span,
+    [data-testid="stAlert"] [data-testid="stMarkdownContainer"] p {{
+        color: var(--color-text-on-page);
+    }}
+    /* 通知枠のアイコン（material icon）も白 */
+    [data-testid="stAlertContentInfo"], [data-testid="stAlertContentWarning"],
+    [data-testid="stAlertContentSuccess"], [data-testid="stAlertContentError"],
+    [data-testid="stAlert"] [data-testid="stIconMaterial"],
+    [data-testid="stAlert"] .material-icons,
+    [data-testid="stAlert"] .material-icons-outlined,
+    [data-testid="stAlert"] svg {{
+        color: var(--color-text-on-page);
+        fill: var(--color-text-on-page);
+    }}
+    /* 通知枠の中のリンク（「ご相談」のmailto）も白系。下線を付けてリンクだと分かるようにする */
+    [data-testid="stAlert"] a, [data-testid="stAlert"] a:visited {{
+        color: var(--color-text-on-page);
+        text-decoration: underline;
     }}
     hr {{
-        border-color: var(--color-line);
+        border-color: var(--color-overlay-line);
         margin: var(--space-xl) 0 var(--space-md) 0;
     }}
+    /* 「資料検索（管理者用）」の折りたたみ */
     [data-testid="stExpander"] {{
+        background: var(--color-overlay-surface);
+        border: 1px solid var(--color-overlay-line);
+        border-radius: var(--radius-surface);
+    }}
+    [data-testid="stExpander"] details, [data-testid="stExpander"] summary {{
         background: transparent;
+        border: 0;
     }}
     [data-testid="stExpander"] summary p {{
-        color: var(--color-text-muted);
+        color: var(--color-text-on-page);
         font-size: var(--text-sm);
+    }}
+    [data-testid="stExpander"] summary svg,
+    [data-testid="stExpander"] summary [data-testid="stIconMaterial"] {{
+        color: var(--color-text-on-page);
+        fill: var(--color-text-on-page);
+    }}
+    /* 見出し（summary）の文字色は .stMarkdown p 等に負けるため、具体的なセレクタで必ず勝たせる */
+    [data-testid="stExpander"] summary,
+    [data-testid="stExpander"] summary span,
+    [data-testid="stExpander"] summary [data-testid="stMarkdownContainer"] p,
+    [data-testid="stExpander"] summary svg {{
+        color: var(--color-text-on-page) !important;
+        fill: currentColor;
+    }}
+    /* 折りたたみの中の文字（検索結果の資料のありか）と入力欄のラベルも白系 */
+    [data-testid="stExpander"] [data-testid="stMarkdownContainer"] p,
+    [data-testid="stExpander"] [data-testid="stMarkdownContainer"] li,
+    [data-testid="stExpander"] [data-testid="stMarkdownContainer"] strong,
+    [data-testid="stExpander"] [data-testid="stWidgetLabel"] p,
+    [data-testid="stExpander"] [data-testid="stCaptionContainer"] p {{
+        color: var(--color-text-on-page) !important;
+    }}
+    /* 入力欄は白地のまま（文字が読めるように）。ボタンは白系の枠線にする */
+    [data-testid="stExpander"] .stTextInput input {{
+        background-color: var(--color-surface);
+        color: var(--color-text);
+        border-color: var(--color-line);
+    }}
+    [data-testid="stExpander"] .stButton button {{
+        background: transparent;
+        border: 1px solid var(--color-overlay-line-strong);
+        color: var(--color-text-on-page);
+    }}
+    [data-testid="stExpander"] .stButton button p {{
+        color: var(--color-text-on-page);
+    }}
+    [data-testid="stExpander"] .stButton button:hover {{
+        background: var(--color-overlay-surface);
+        border-color: var(--color-text-on-page);
+    }}
+
+    /* 追加質問のやり取り（吹き出し）。カードの外に描かれるため、半透明の面＋白い文字にする */
+    [data-testid="stChatMessage"] {{
+        background: var(--color-overlay-surface);
+        border: 1px solid var(--color-overlay-line);
+        border-radius: var(--radius-surface);
+        color: var(--color-text-on-page);
+    }}
+    [data-testid="stChatMessage"] p,
+    [data-testid="stChatMessage"] li,
+    [data-testid="stChatMessage"] strong,
+    [data-testid="stChatMessage"] [data-testid="stMarkdownContainer"] p,
+    [data-testid="stChatMessage"] [data-testid="stCaptionContainer"] p {{
+        color: var(--color-text-on-page);
+    }}
+    [data-testid="stChatMessage"] a, [data-testid="stChatMessage"] a:visited {{
+        color: var(--color-text-on-page);
+        text-decoration: underline;
+    }}
+    [data-testid="stChatMessage"] hr {{
+        border-color: var(--color-overlay-line);
+    }}
+
+    /* 初回読み込みのスピナー文言と、その中の進捗バーの文字（いずれもカードの外） */
+    [data-testid="stSpinner"] p, [data-testid="stSpinner"] div {{
+        color: var(--color-text-on-page-soft);
+    }}
+    [data-testid="stProgress"] p, [data-testid="stProgress"] div[data-testid="stMarkdownContainer"] p {{
+        color: var(--color-text-on-page-soft);
     }}
 
     /* 操作への応答（短いトランジション）。フォーカスリング（box-shadow・outline）には付けない */
