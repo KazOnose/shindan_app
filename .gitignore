@@ -1,0 +1,22 @@
+# 環境変数（APIキー）
+.env
+
+# ログ
+logs/
+
+# Python
+__pycache__/
+*.py[cod]
+*.egg-info/
+.venv/
+venv/
+env/
+
+# エディタ・OS
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Streamlit Secrets（Community Cloudのローカル動作確認用）
+.streamlit/secrets.toml

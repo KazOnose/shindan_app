@@ -1,0 +1,10 @@
+[theme]
+primaryColor = "#1F3A5F"
+backgroundColor = "#F5F7FA"
+secondaryBackgroundColor = "#E9EDF2"
+textColor = "#1A1A1A"
+font = "sans serif"
+
+[client]
+# 利用者向け画面のため、右上の開発用ツールバー（Deploy など）を最小表示にする
+toolbarMode = "minimal"
