@@ -875,13 +875,13 @@ NO_PATTERN_NOTICE_MESSAGE = "この診断は、御社の状況に近い一般的
 NEEDS_OTHER_SYSTEM_NONE_TEXT = "特にありません"
 
 # 相談導線の文言（初版はリード獲得を実装せず、この文言のみを出す）
-CONSULT_MESSAGE = "詳しくはご相談ください。"
+CONSULT_MESSAGE = "この診断は一般的な目安です。御社の資料をもとにした具体的な提案をご希望の方は、お気軽にご相談ください。"
 
 # 相談導線のメール宛先・件名（「ご相談」をmailtoリンク化する際に使う）
 CONSULT_MAIL_ADDRESS = "designstudiowave@gmail.com"
 CONSULT_MAIL_SUBJECT = "AI活用診断についての相談"
 # 「ご相談」をMarkdownのリンクにして表示するフォーマット（{mailto}にmailto URLを埋める）
-CONSULT_MESSAGE_FORMAT = "詳しくは [ご相談]({mailto}) ください。"
+CONSULT_MESSAGE_FORMAT = "この診断は一般的な目安です。御社の資料をもとにした具体的な提案をご希望の方は、お気軽に[ご相談]({mailto})ください。"
 
 # 対応パターンが「ある」場合の「該当パターン」欄の組み立てフォーマット
 # （LLMの生成文ではなく、パターン文書のメタ行から組み立てた文字列を表示する）
