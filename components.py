@@ -238,6 +238,19 @@ def build_result_blocks():
     return blocks
 
 
+def clear_results():
+    """
+    診断結果と追加質問のやりとりを消して、最初からやり直せるようにする
+
+    表示用の会話ログ（messages）とLLMに渡す会話履歴（chat_history）だけを空にする。
+    読み込み済みのデータ（db・pattern_index など）と入力フォームの選択内容は消さない。
+    """
+    st.session_state.messages = []
+    st.session_state.chat_history = []
+    if "just_diagnosed" in st.session_state:
+        st.session_state.just_diagnosed = False
+
+
 def display_results():
     """
     メイン画面の下段に、診断結果と追加質問のやりとりを表示
@@ -251,9 +264,15 @@ def display_results():
     if not blocks:
         return
 
-    # 結果セクションの見出し
+    # 結果セクションの見出し（右にリセットボタンを並べる）
     st.write("")
-    st.markdown(f"### {ct.RESULT_SECTION_TITLE}")
+    heading_col, button_col = st.columns([3, 1], vertical_alignment="bottom")
+    with heading_col:
+        st.markdown(f"### {ct.RESULT_SECTION_TITLE}")
+    with button_col:
+        if st.button(ct.RESULT_CLEAR_BUTTON_LABEL, key=ct.RESULT_CLEAR_BUTTON_KEY, use_container_width=True):
+            clear_results()
+            st.rerun()
 
     # 診断ボタンを押した直後の描画のときだけ、登場用の追加CSSを出す（次の再実行では出さない）
     show_entrance = st.session_state.get("just_diagnosed", False)

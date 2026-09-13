@@ -528,6 +528,31 @@ CUSTOM_CSS = f"""
         border-color: var(--color-text-on-page);
     }}
 
+    /* 「結果を消してやり直す」ボタン。白いカードの外（背景に直接）に置かれるため、控えめな見た目にする */
+    .st-key-clear_results_button {{
+        display: flex;
+        justify-content: flex-end;
+        align-items: center;
+        height: 100%;
+    }}
+    .st-key-clear_results_button button {{
+        min-height: 2.2rem;
+        padding: 0 var(--space-md);
+        background: transparent;
+        border: 1px solid rgba(255,255,255,0.4);
+        color: var(--color-text-on-page);
+        font-size: var(--text-sm);
+        font-weight: 500;
+    }}
+    .st-key-clear_results_button button p {{
+        color: var(--color-text-on-page);
+        font-size: var(--text-sm);
+    }}
+    .st-key-clear_results_button button:hover {{
+        background: var(--color-overlay-surface);
+        border-color: var(--color-text-on-page);
+    }}
+
     /* 追加質問のやり取り（吹き出し）。カードの外に描かれるため、半透明の面＋白い文字にする */
     [data-testid="stChatMessage"] {{
         background: var(--color-overlay-surface);
@@ -857,6 +882,9 @@ SIDEBAR_SECTION_NOTE_HELP = "「その他」以外を選んだ場合は、書か
 RESULT_SECTION_TITLE = "診断結果"
 RESULT_BLOCK_LABEL_LATEST = "最新の診断"
 RESULT_BLOCK_LABEL_PAST = "過去の診断（{number}回目）"
+# 結果を消してやり直すボタン
+RESULT_CLEAR_BUTTON_LABEL = "結果を消してやり直す"
+RESULT_CLEAR_BUTTON_KEY = "clear_results_button"
 DIAGNOSIS_FORM_SUBMIT_LABEL = "この内容で診断する"
 DIAGNOSIS_FORM_MATERIAL_PLACEHOLDER = "あるものをすべて選んでください（無ければ空のまま）"
 # 診断前に、フォームの下へ出す案内文
