@@ -86,6 +86,7 @@ shindan_app/
 3. Advanced settings で Python 3.11 を選ぶ
 4. Secrets に `OPENAI_API_KEY = "sk-..."`（クォート有り）を登録する
 5. Deploy する。初回起動時に `data/` 配下を読み込んでベクターストアを作るため、1分ほどかかる
+- Community Cloud では SQLite の版が古く Chroma が動かないため、requirements.txt の pysqlite3-binary で差し替えています（main.py 先頭）。Windows ローカルでは不要です。
 
 ## パターン文書の増やし方
 

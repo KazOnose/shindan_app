@@ -5,10 +5,19 @@
 ############################################################
 # 1. ライブラリの読み込み
 ############################################################
+# Community Cloud の SQLite が古く Chroma が動かないため、pysqlite3 があれば差し替える。ローカルには無いので何もしない
+try:
+    __import__("pysqlite3")
+    import sys
+    sys.modules["sqlite3"] = sys.modules.pop("pysqlite3")
+except ImportError:
+    pass
 # 「.env」ファイルから環境変数を読み込むための関数
 from dotenv import load_dotenv
 # ログ出力を行うためのモジュール
 import logging
+# エラー発生時にスタックトレースを標準出力へ出すためのモジュール
+import traceback
 # streamlitアプリの表示を担当するモジュール
 import streamlit as st
 # （自作）画面表示以外の様々な関数が定義されているモジュール
@@ -33,20 +42,48 @@ st.set_page_config(
 # ログ出力を行うためのロガーの設定
 logger = logging.getLogger(ct.LOGGER_NAME)
 
+# 画面全体の装飾（CSS）を適用
+# （初期化処理には時間がかかるため、タイトルと1行の説明を先に描いてから初期化を行う）
+cn.apply_custom_style()
+
+# タイトル表示
+cn.display_app_title()
+
 
 ############################################################
 # 3. 初期化処理
 ############################################################
-try:
-    # 初期化処理（「initialize.py」の「initialize」関数を実行）
-    initialize()
-except Exception as e:
-    # エラーログの出力
-    logger.error(f"{ct.INITIALIZE_ERROR_MESSAGE}\n{e}")
-    # エラーメッセージの画面表示
-    st.error(utils.build_error_message(ct.INITIALIZE_ERROR_MESSAGE), icon=ct.ERROR_ICON)
-    # 後続の処理を中断
-    st.stop()
+# 初回アクセス（ベクターストア未作成）のときだけ、読み込み中の表示を出す
+if "db" not in st.session_state:
+    with st.spinner(ct.LOADING_SPINNER_TEXT):
+        try:
+            # 初期化処理（「initialize.py」の「initialize」関数を実行）
+            initialize()
+        except Exception as e:
+            # エラーログの出力
+            logger.error(f"{ct.INITIALIZE_ERROR_MESSAGE}\n{e}")
+            # エラー本文を標準出力にも出す
+            print(f"{ct.INITIALIZE_ERROR_MESSAGE} {type(e).__name__}: {e}")
+            print(traceback.format_exc())
+            # エラーメッセージの画面表示
+            st.error(utils.build_error_message(ct.INITIALIZE_ERROR_MESSAGE), icon=ct.ERROR_ICON)
+            # 後続の処理を中断
+            st.stop()
+else:
+    # 2回目以降の再実行では、読み込み中の表示を出さずに初期化処理を通す
+    try:
+        # 初期化処理（「initialize.py」の「initialize」関数を実行）
+        initialize()
+    except Exception as e:
+        # エラーログの出力
+        logger.error(f"{ct.INITIALIZE_ERROR_MESSAGE}\n{e}")
+        # エラー本文を標準出力にも出す
+        print(f"{ct.INITIALIZE_ERROR_MESSAGE} {type(e).__name__}: {e}")
+        print(traceback.format_exc())
+        # エラーメッセージの画面表示
+        st.error(utils.build_error_message(ct.INITIALIZE_ERROR_MESSAGE), icon=ct.ERROR_ICON)
+        # 後続の処理を中断
+        st.stop()
 
 # アプリ起動時のログファイルへの出力
 if not "initialized" in st.session_state:
@@ -58,13 +95,9 @@ st.session_state.mode = ct.ANSWER_MODE_1
 
 
 ############################################################
-# 4. 初期表示（タイトルと、上段の入力フォーム）
+# 4. 初期表示（上段の入力フォーム）
 ############################################################
-# 画面全体の装飾（CSS）を適用
-cn.apply_custom_style()
-
-# タイトル表示
-cn.display_app_title()
+# （画面全体の装飾とタイトル表示は、初期化処理より前の「2. 設定関連」で行っている）
 
 # 入力フォームを表示（送信ボタンが押されたかどうかと入力値を受け取る）
 form_input = cn.display_diagnosis_form()

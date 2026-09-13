@@ -42,6 +42,15 @@ DIAGNOSIS_PROGRESS_STEPS = [
 ]
 DIAGNOSIS_PROGRESS_NOTE = "10〜20秒ほどお待ちください。"
 
+# 初回アクセス時（ベクターストアの作成中）に表示する文言
+# 「st.spinner」の文言と、その中で出すフォルダ単位の進捗バーの文言
+LOADING_SPINNER_TEXT = "御社の診断に使う資料を読み込んでいます。初回のみ 10〜20 秒ほどかかります。"
+LOADING_PROGRESS_FOLDER_TEXT = "資料を読み込み中: {folder}"
+LOADING_PROGRESS_EMBED_TEXT = "資料を検索できる形に変換しています"
+LOADING_PROGRESS_DONE_TEXT = "準備ができました"
+# ベクトル化（最後の1区間）に入ったときに表示する進捗バーの値
+LOADING_PROGRESS_EMBED_VALUE = 90
+
 # ==========================================
 # 画面の装飾（デザイントークン）
 # ==========================================

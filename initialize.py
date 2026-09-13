@@ -65,20 +65,34 @@ def initialize_api_key():
     登録した値を使い、ローカルではSecretsが無いため.envの値を使う。
     「langchain_openai」の「ChatOpenAI」「OpenAIEmbeddings」は環境変数「OPENAI_API_KEY」を
     読むため、ここで環境変数へセットすれば両方に効く。
+    secrets ファイルが無い環境では st.secrets に触らない（触ると画面に警告が出るため）。
     """
-    # ローカルで「secrets.toml」が無い環境では、st.secretsの参照自体が例外になることがあるため、
-    # try文で「secrets」の有無を確認する
-    has_secret = False
-    try:
-        has_secret = "OPENAI_API_KEY" in st.secrets
-    except Exception:
-        has_secret = False
+    # Streamlitがsecrets.tomlを探す既定の2箇所のパスを組み立てる
+    # 1. ユーザーのホームディレクトリ配下
+    home_secrets_path = os.path.join(os.path.expanduser("~"), ".streamlit", "secrets.toml")
+    # 2. カレントディレクトリ（アプリの実行ディレクトリ）配下
+    cwd_secrets_path = os.path.join(os.getcwd(), ".streamlit", "secrets.toml")
 
-    if has_secret:
-        # Secretsに登録された値を環境変数へセット
-        os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+    # どちらかのパスにsecrets.tomlが存在するかどうかを確認
+    secrets_file_exists = os.path.isfile(home_secrets_path) or os.path.isfile(cwd_secrets_path)
+
+    if secrets_file_exists:
+        # secrets.tomlが存在する場合のみ、st.secretsに触れる
+        # （存在確認済みでも念のためtry文で「secrets」の有無を確認する）
+        has_secret = False
+        try:
+            has_secret = "OPENAI_API_KEY" in st.secrets
+        except Exception:
+            has_secret = False
+
+        if has_secret:
+            # Secretsに登録された値を環境変数へセット
+            os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
+        else:
+            # Secretsに「OPENAI_API_KEY」が無い場合は、従来どおり「.env」ファイルを読み込む
+            load_dotenv()
     else:
-        # Secretsが無い場合は、従来どおり「.env」ファイルを読み込む
+        # secrets.tomlが無い場合、st.secretsには触れず「.env」ファイルだけを読み込む
         load_dotenv()
 
 
@@ -498,8 +512,13 @@ def initialize_retriever():
     if "retriever" in st.session_state:
         return
 
-    # RAGの参照先となるデータソースの読み込み
-    docs_all = load_data_sources()
+    # 読み込みの進み具合を表示する場所を用意し、その中に進捗バーを置く
+    # （準備が終わったら「progress_box.empty()」でまとめて消す）
+    progress_box = st.empty()
+    progress_bar = progress_box.progress(0, text=ct.LOADING_SPINNER_TEXT)
+
+    # RAGの参照先となるデータソースの読み込み（フォルダを1つ読み終えるたびに進捗バーが進む）
+    docs_all = load_data_sources(progress_bar)
 
     # OSがWindowsの場合、Unicode正規化と、cp932（Windows用の文字コード）で表現できない文字を除去
     for doc in docs_all:
@@ -532,8 +551,15 @@ def initialize_retriever():
     # チャンク分割の対象外としたドキュメントを、分割済みのドキュメントに追加
     splitted_docs.extend(no_split_docs)
 
+    # 資料の読み込みが終わり、ここからは時間のかかるベクトル化（最後の1区間）に入る
+    progress_bar.progress(ct.LOADING_PROGRESS_EMBED_VALUE, text=ct.LOADING_PROGRESS_EMBED_TEXT)
+
     # ベクターストアの作成
     db = Chroma.from_documents(splitted_docs, embedding=embeddings)
+
+    # 準備が終わったことを表示し、進捗バーごと画面から消す
+    progress_bar.progress(100, text=ct.LOADING_PROGRESS_DONE_TEXT)
+    progress_box.empty()
 
     # 診断時にパターン文書だけへ絞り込んだRetrieverを作れるよう、ベクターストアを保持しておく
     st.session_state.db = db
@@ -560,17 +586,48 @@ def initialize_session_state():
         st.session_state.just_diagnosed = False
 
 
-def load_data_sources():
+def load_data_sources(progress_bar=None):
     """
     RAGの参照先となるデータソースの読み込み
+
+    Args:
+        progress_bar: 読み込みの進み具合を表示する進捗バー（省略時・Noneのときは更新しない）
 
     Returns:
         読み込んだ通常データソース
     """
     # データソースを格納する用のリスト
     docs_all = []
-    # ファイル読み込みの実行（渡した各リストにデータが格納される）
-    recursive_file_check(ct.RAG_TOP_FOLDER_PATH, docs_all)
+
+    # 「data」直下の一覧を、並び順が安定するよう名前順に取得
+    top_names = sorted(os.listdir(ct.RAG_TOP_FOLDER_PATH))
+
+    # 進捗バーの分母に使うため、直下のフォルダ数を数える
+    # （「+1」は最後のベクトル化の分。フォルダを1つ読み終えるたびに1区間ずつ進める）
+    folder_count = 0
+    for name in top_names:
+        if os.path.isdir(os.path.join(ct.RAG_TOP_FOLDER_PATH, name)):
+            folder_count += 1
+    folder_total = folder_count + 1
+
+    # 読み終えたフォルダ数
+    loaded_count = 0
+
+    # ファイル読み込みの実行（渡したリストにデータが格納される）
+    for name in top_names:
+        full_path = os.path.join(ct.RAG_TOP_FOLDER_PATH, name)
+        if os.path.isdir(full_path):
+            # フォルダの場合、フォルダ単位で読み込み、読み終えたら進捗バーを進める
+            recursive_file_check(full_path, docs_all)
+            loaded_count += 1
+            if progress_bar is not None:
+                progress_bar.progress(
+                    int(loaded_count / folder_total * 100),
+                    text=ct.LOADING_PROGRESS_FOLDER_TEXT.format(folder=name)
+                )
+        else:
+            # 直下にファイルが置かれている場合は、従来どおりそのまま読み込む
+            file_load(full_path, docs_all)
 
     web_docs_all = []
     # ファイルとは別に、指定のWebページ内のデータも読み込み
