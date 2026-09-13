@@ -1,7 +1,6 @@
 # 中小企業向け AI活用診断
 
-中小企業の経営者・採用担当が自社の状況を選ぶと、AI活用のパターン（またはパターンが未整備な困りごとについては一般的な目安）を、根拠となる資料付きで返すアプリです。
-DMM生成AIキャンプ Chapter2「社内情報特化型生成AI検索アプリ」の配布コード（Streamlit＋LangChain＋Chroma＋OpenAI）を土台に、5ファイル分割の構造をそのまま維持して改修しています。
+中小企業の経営者が自社の業種・規模・困りごと・社内にある材料を選ぶと、AI活用の取り組み例（具体パターンが無い困りごとについては一般的な目安）を、根拠となる資料付きで返すアプリです。Streamlit＋LangChain＋Chroma＋OpenAI で構成しています。
 
 ## 起動手順（Windows / Python 3.11）
 
@@ -64,7 +63,7 @@ shindan_app/
   constants.py             文言・選択肢・プロンプト・RAG設定の一括管理
   .streamlit/config.toml   画面の配色
   requirements.txt         パッケージ一覧（Community Cloud公開用。requirements_windows.txtからWindows専用パッケージを除いたもの）
-  requirements_windows.txt パッケージ一覧（配布コードから変更なし。Windowsのローカル環境で使う）
+  requirements_windows.txt パッケージ一覧（Windowsのローカル環境で使う）
   .env.example             .env のひな形（OPENAI_API_KEY の1行のみ）
   .gitignore               .env とログを除外
   README.md                このファイル
@@ -101,19 +100,19 @@ shindan_app/
 
 困りごとIDは半角カンマ区切りで複数書けます（全角カンマ・読点・全角空白の揺れも読み取ります）。パターン文書はメタ行が各チャンクに残るよう、チャンク分割の対象外にしています。
 
-## 講座内容との対応
+## 実装で使っている主な技術要素
 
-| 講座で学んだこと | このアプリでの使い所 |
+| 技術要素 | このアプリでの使い所 |
 |---|---|
 | RAG（Chroma＋Retriever） | `initialize.py` で `Chroma.from_documents` によりベクターストアを作り、パターン層・枠組み層・調査データ・サービス案から検索する |
 | LangChain（create_history_aware_retriever／create_stuff_documents_chain／create_retrieval_chain） | `utils.get_llm_response` で診断と追加質問の両方を同じChain構造で処理し、会話履歴を保持する |
 | Streamlit（ラジオ・pills・multiselect・chat_input・session_state） | `components.display_diagnosis_form` の入力フォーム、`main.py` の会話ログと追加質問。領域の選択に応じて困りごとの選択肢10件を切り替える |
-| データ前処理（課題⑥のCSV統合と同じ考え方） | パターン文書の先頭メタ行を起動時に読み、困りごとIDとパターン文書の紐づけ一覧を作る。メタ行が各チャンクに残るよう分割対象から外す |
+| データ前処理（メタ行によるパターン索引） | パターン文書の先頭メタ行を起動時に読み、困りごとIDとパターン文書の紐づけ一覧を作る。メタ行が各チャンクに残るよう分割対象から外す |
 | データ前処理（メタ行による索引） | `data/業種/` の先頭メタ行「業種:」を起動時に読んで業種→ファイルの索引を作り、診断時に選ばれた業種の文書を検索対象へ加える（`initialize.build_industry_index`） |
-| 拡張子追加（課題⑤） | `SUPPORTED_EXTENSIONS` に `.md` を追加し、`data/` 配下のMarkdownを読み込む |
+| 読み込み拡張子の追加 | `SUPPORTED_EXTENSIONS` に `.md` を追加し、`data/` 配下のMarkdownを読み込む |
 | プロンプト設計 | 診断プロンプトを「対応パターンあり」「対応パターンなし」の2本に分け、4ブロック固定出力・4区分の書き分け・専門用語禁止・文脈に無い数値の禁止を指示する |
-| Lesson14 Agents（initialize_agent × Tool） | 追加質問で、質問内容に応じて3つの Tool（取り組みの詳細／根拠の数字／サービスと相談方法）から agent が選んで検索する。失敗時は従来の RAG 回答へフォールバック |
-| Output Parser（Lesson10） | `PydanticOutputParser` で診断結果の8項目を受け取り、失敗時は `RetryWithErrorOutputParser` で1回だけ再試行する。それでも失敗した場合は生成された文章をそのまま表示してアプリを止めない |
+| Agents（initialize_agent × Tool） | 追加質問で、質問内容に応じて3つの Tool（取り組みの詳細／根拠の数字／サービスと相談方法）から agent が選んで検索する。失敗時は従来の RAG 回答へフォールバック |
+| Output Parser | `PydanticOutputParser` で診断結果の8項目を受け取り、失敗時は `RetryWithErrorOutputParser` で1回だけ再試行する。それでも失敗した場合は生成された文章をそのまま表示してアプリを止めない |
 
 ## 診断結果の構成
 
