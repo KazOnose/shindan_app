@@ -57,14 +57,12 @@ def initialize():
     initialize_retriever()
 
 
-def initialize_api_key():
+def is_running_on_cloud():
     """
-    OPENAI_API_KEYの読み込み
+    Streamlit Community Cloud 上で動いているかどうかの判定
 
-    優先順位は「st.secrets → .env」。Streamlit Community Cloudで動かす場合はSecretsに
-    登録した値を使い、ローカルではSecretsが無いため.envの値を使う。
-    「langchain_openai」の「ChatOpenAI」「OpenAIEmbeddings」は環境変数「OPENAI_API_KEY」を
-    読むため、ここで環境変数へセットすれば両方に効く。
+    secrets.toml（ホーム配下またはカレント配下）が存在し、st.secrets に「OPENAI_API_KEY」が
+    あれば Cloud 上とみなす。ローカルでは secrets.toml が無いため False になる。
     secrets ファイルが無い環境では st.secrets に触らない（触ると画面に警告が出るため）。
     """
     # Streamlitがsecrets.tomlを探す既定の2箇所のパスを組み立てる
@@ -76,33 +74,44 @@ def initialize_api_key():
     # どちらかのパスにsecrets.tomlが存在するかどうかを確認
     secrets_file_exists = os.path.isfile(home_secrets_path) or os.path.isfile(cwd_secrets_path)
 
-    if secrets_file_exists:
-        # secrets.tomlが存在する場合のみ、st.secretsに触れる
-        # （存在確認済みでも念のためtry文で「secrets」の有無を確認する）
-        has_secret = False
-        try:
-            has_secret = "OPENAI_API_KEY" in st.secrets
-        except Exception:
-            has_secret = False
+    if not secrets_file_exists:
+        # secrets.tomlが無い場合、st.secretsには触れない
+        return False
 
-        if has_secret:
-            # Secretsに登録された値を環境変数へセット
-            os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
-        else:
-            # Secretsに「OPENAI_API_KEY」が無い場合は、従来どおり「.env」ファイルを読み込む
-            load_dotenv()
+    # secrets.tomlが存在する場合のみ、st.secretsに触れる
+    # （存在確認済みでも念のためtry文で「secrets」の有無を確認する）
+    try:
+        return "OPENAI_API_KEY" in st.secrets
+    except Exception:
+        return False
+
+
+def initialize_api_key():
+    """
+    OPENAI_API_KEYの読み込み
+
+    優先順位は「st.secrets → .env」。Streamlit Community Cloudで動かす場合はSecretsに
+    登録した値を使い、ローカルではSecretsが無いため.envの値を使う。
+    「langchain_openai」の「ChatOpenAI」「OpenAIEmbeddings」は環境変数「OPENAI_API_KEY」を
+    読むため、ここで環境変数へセットすれば両方に効く。
+    """
+    if is_running_on_cloud():
+        # Secretsに登録された値を環境変数へセット
+        os.environ["OPENAI_API_KEY"] = st.secrets["OPENAI_API_KEY"]
     else:
-        # secrets.tomlが無い場合、st.secretsには触れず「.env」ファイルだけを読み込む
+        # Secretsに「OPENAI_API_KEY」が無い場合（ローカル等）は、従来どおり「.env」ファイルを読み込む
         load_dotenv()
 
 
 def initialize_logger():
     """
     ログ出力の設定
-    """
-    # 指定のログフォルダが存在すれば読み込み、存在しなければ新規作成
-    os.makedirs(ct.LOG_DIR_PATH, exist_ok=True)
 
+    Streamlit Community Cloud上では、アプリのフォルダ（logs/application.log）へ書き込むと
+    Cloudがファイル変更を検知して再デプロイ（Pulling code changes → Updated app!）を
+    繰り返してしまうため、Cloud上では標準出力への出力だけにする。
+    ローカルでは従来どおり、logs/application.log へ書き込む。
+    """
     # 引数に指定した名前のロガー（ログを記録するオブジェクト）を取得
     # 再度別の箇所で呼び出した場合、すでに同じ名前のロガーが存在していれば読み込む
     logger = logging.getLogger(ct.LOGGER_NAME)
@@ -111,12 +120,20 @@ def initialize_logger():
     if logger.hasHandlers():
         return
 
-    # 1日単位でログファイルの中身をリセットし、切り替える設定
-    log_handler = TimedRotatingFileHandler(
-        os.path.join(ct.LOG_DIR_PATH, ct.LOG_FILE),
-        when="D",
-        encoding="utf8"
-    )
+    if is_running_on_cloud():
+        # Cloud上ではアプリのフォルダへ書くと再デプロイが繰り返されるため、標準出力だけにする
+        log_handler = logging.StreamHandler(sys.stdout)
+    else:
+        # ローカルでは、指定のログフォルダが存在すれば読み込み、存在しなければ新規作成
+        os.makedirs(ct.LOG_DIR_PATH, exist_ok=True)
+
+        # 1日単位でログファイルの中身をリセットし、切り替える設定
+        log_handler = TimedRotatingFileHandler(
+            os.path.join(ct.LOG_DIR_PATH, ct.LOG_FILE),
+            when="D",
+            encoding="utf8"
+        )
+
     # 出力するログメッセージのフォーマット定義
     # - 「levelname」: ログの重要度（INFO, WARNING, ERRORなど）
     # - 「asctime」: ログのタイムスタンプ（いつ記録されたか）
