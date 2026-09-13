@@ -135,6 +135,11 @@ CUSTOM_CSS = f"""
         display: none;
     }}
 
+    /* ヘッダー帯を透明化（右上ツールバーの規則には触れない） */
+    [data-testid="stHeader"] {{
+        background: transparent;
+    }}
+
     /* 書体: 1ファミリー。アイコンフォントは巻き込まない */
     html, body, .stApp, .stMarkdown, .stCaption, .stRadio, .stSelectbox, .stMultiSelect,
     .stTextInput, .stButton, .stFormSubmitButton, .stExpander, .stAlert, .stChatMessage,
@@ -160,7 +165,7 @@ CUSTOM_CSS = f"""
     /* 行長を保つため本文幅を絞る */
     .block-container {{
         max-width: {STYLE_CONTENT_MAX_WIDTH};
-        padding-top: var(--space-2xl);
+        padding-top: 3rem;
         padding-bottom: var(--space-2xl);
     }}
 
