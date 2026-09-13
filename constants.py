@@ -165,7 +165,7 @@ CUSTOM_CSS = f"""
         font-weight: 700;
         color: var(--color-text);
         padding: var(--space-md) 0 0 0;
-        margin: 0 0 var(--space-xs) 0;
+        margin: 0 0 var(--space-sm) 0;
     }}
     .stMarkdown p, .stRadio label p {{
         font-size: var(--text-md);
