@@ -138,6 +138,8 @@ CUSTOM_CSS = f"""
     /* ヘッダー帯を透明化（右上ツールバーの規則には触れない） */
     [data-testid="stHeader"] {{
         background: transparent;
+        position: relative;
+        z-index: 2;
     }}
 
     /* 書体: 1ファミリー。アイコンフォントは巻き込まない */
@@ -154,16 +156,76 @@ CUSTOM_CSS = f"""
             radial-gradient(at 78% 20%, rgba(31,56,100,0.55), rgba(0,0,0,0) 60%),
             linear-gradient(168deg, #141d35 0%, #0a0f1c 76%);
         background-size: 28px 28px, auto, auto;
+        background-position: 0 0, 0 0, 0 0;
         background-attachment: fixed;
         color: var(--color-text);
+        animation: shindan-bg-dots-drift 60s linear infinite;
+    }}
+    /* 背景の動き1: ぼかした光の玉を2つ、ゆっくり往復させる */
+    .stApp::before {{
+        content: "";
+        position: fixed;
+        inset: 0;
+        z-index: 0;
+        pointer-events: none;
+        background-image:
+            radial-gradient(circle, rgba(31,56,100,0.6), rgba(31,56,100,0) 70%),
+            radial-gradient(circle, rgba(80,110,170,0.35), rgba(80,110,170,0) 70%);
+        background-repeat: no-repeat, no-repeat;
+        background-size: 40vw 40vw, 42vw 42vw;
+        background-position: 12% 18%, 82% 72%;
+        filter: blur(60px);
+        animation: shindan-bg-glow-move 30s ease-in-out infinite alternate;
+    }}
+    /* 背景の動き2: 細い線の六角形（頂点に小さな円）を右上寄りにゆっくり回転させる */
+    .stApp::after {{
+        content: "";
+        position: fixed;
+        top: -20vw;
+        right: -15vw;
+        width: 60vw;
+        height: 60vw;
+        z-index: 0;
+        pointer-events: none;
+        background-image: url("data:image/svg+xml,%3Csvg%20xmlns='http://www.w3.org/2000/svg'%20viewBox='0%200%20200%20200'%3E%3Cpolygon%20points='190,100%20145,178%2055,178%2010,100%2055,22%20145,22'%20fill='none'%20stroke='rgba(255,255,255,0.12)'%20stroke-width='1'/%3E%3Ccircle%20cx='190'%20cy='100'%20r='3'%20fill='rgba(255,255,255,0.12)'/%3E%3Ccircle%20cx='145'%20cy='178'%20r='3'%20fill='rgba(255,255,255,0.12)'/%3E%3Ccircle%20cx='55'%20cy='178'%20r='3'%20fill='rgba(255,255,255,0.12)'/%3E%3Ccircle%20cx='10'%20cy='100'%20r='3'%20fill='rgba(255,255,255,0.12)'/%3E%3Ccircle%20cx='55'%20cy='22'%20r='3'%20fill='rgba(255,255,255,0.12)'/%3E%3Ccircle%20cx='145'%20cy='22'%20r='3'%20fill='rgba(255,255,255,0.12)'/%3E%3C/svg%3E");
+        background-size: contain;
+        background-repeat: no-repeat;
+        animation: shindan-bg-hex-rotate 90s linear infinite;
+    }}
+    @keyframes shindan-bg-dots-drift {{
+        0% {{ background-position: 0 0, 0 0, 0 0; }}
+        100% {{ background-position: 28px 28px, 0 0, 0 0; }}
+    }}
+    @keyframes shindan-bg-glow-move {{
+        0% {{ transform: translate(0, 0); }}
+        50% {{ transform: translate(3vw, -2vw); }}
+        100% {{ transform: translate(-2vw, 3vw); }}
+    }}
+    @keyframes shindan-bg-hex-rotate {{
+        from {{ transform: rotate(0deg); }}
+        to {{ transform: rotate(360deg); }}
+    }}
+    @media (prefers-reduced-motion: reduce) {{
+        .stApp {{
+            animation: none;
+        }}
+        .stApp::before, .stApp::after {{
+            animation: none;
+        }}
     }}
     ::selection {{
         background: var(--color-primary);
         color: var(--color-text-on-primary);
     }}
 
-    /* 行長を保つため本文幅を絞る */
+    /* 行長を保つため本文幅を絞る（背景の動きより前面に出す） */
+    [data-testid="stMain"], section.main {{
+        position: relative;
+        z-index: 1;
+    }}
     .block-container {{
+        position: relative;
+        z-index: 1;
         max-width: {STYLE_CONTENT_MAX_WIDTH};
         padding-top: 3rem;
         padding-bottom: var(--space-2xl);
@@ -515,6 +577,15 @@ CUSTOM_CSS = f"""
     /* 初回読み込みのスピナー文言と、その中の進捗バーの文字（いずれもカードの外） */
     [data-testid="stSpinner"] p, [data-testid="stSpinner"] div {{
         color: var(--color-text-on-page-soft);
+    }}
+    /* 背景が動くようになったため、スピナーの回転アイコンと文言をより明るい白にして視認性を保つ */
+    [data-testid="stSpinner"] i,
+    [data-testid="stSpinner"] > div > div {{
+        border-top-color: rgba(255,255,255,0.85) !important;
+        color: rgba(255,255,255,0.85);
+    }}
+    [data-testid="stSpinner"] p {{
+        color: rgba(255,255,255,0.85);
     }}
     [data-testid="stProgress"] p, [data-testid="stProgress"] div[data-testid="stMarkdownContainer"] p {{
         color: var(--color-text-on-page-soft);
