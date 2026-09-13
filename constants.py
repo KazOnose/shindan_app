@@ -179,6 +179,8 @@ CUSTOM_CSS = f"""
         margin: 0;
         padding: 0;
         overflow: visible;
+        position: fixed;
+        z-index: 0 !important;
     }}
     ::selection {{
         background: var(--color-primary);
@@ -196,6 +198,14 @@ CUSTOM_CSS = f"""
         max-width: {STYLE_CONTENT_MAX_WIDTH};
         padding-top: 3rem;
         padding-bottom: var(--space-2xl);
+    }}
+    /* カード外の要素（.block-container直下の各ブロック）は球より前面に出す */
+    [data-testid="stVerticalBlock"] > [data-testid="stElementContainer"],
+    [data-testid="stExpander"],
+    [data-testid="stAlert"],
+    [data-testid="stChatMessage"] {{
+        position: relative;
+        z-index: 1;
     }}
 
     /* 見出しのスケール */
@@ -253,6 +263,8 @@ CUSTOM_CSS = f"""
     /* 入力フォームの面: この画面で唯一、影で浮かせる面
        ※ 枠なしの内部ブロックも同じtestidを持つため、既定の空クラス（st-emotion-cache-0）を除外して枠付きだけに当てる */
     [data-testid="stVerticalBlockBorderWrapper"]:not(.st-emotion-cache-0) {{
+        position: relative;
+        z-index: 2;
         background: var(--color-surface);
         border: 0;
         border-radius: var(--radius-surface);
@@ -356,6 +368,8 @@ CUSTOM_CSS = f"""
 
     /* 診断結果のブロック: 白い面を1pxの罫線で区切る。紺の地の上では影で浮かせる。該当パターンだけ紺の面 */
     .shindan-panel {{
+        position: relative;
+        z-index: 2;
         background: var(--color-surface);
         border: 1px solid var(--color-line);
         border-radius: var(--radius-surface);
@@ -703,13 +717,13 @@ BACKGROUND_CANVAS_HTML = """
 <script>
 (function () {
     // --- 調整用の値 ---
-    var POINT_COUNT = 220;          // 球面に散らす点の数
+    var POINT_COUNT = 380;          // 球面に散らす点の数
     var ROTATION_SECONDS = 60;      // Y軸まわりに1周する秒数
-    var CENTER_X_RATIO = 0.72;      // 球の中心（画面幅に対する割合）
-    var CENTER_Y_RATIO = 0.45;      // 球の中心（画面高さに対する割合）
-    var RADIUS_RATIO = 0.38;        // 半径（画面の短辺に対する割合）
+    var CENTER_X_RATIO = 0.5;       // 球の中心（画面幅に対する割合）
+    var CENTER_Y_RATIO = 0.5;       // 球の中心（画面高さに対する割合）
+    var RADIUS_RATIO = 0.55;        // 半径（画面の長辺に対する割合）
     var CAMERA_FACTOR = 3;          // 視点距離 = 半径 * この値
-    var LINK_DISTANCE = 60;         // 点と点を線で結ぶ投影距離の上限(px)
+    var LINK_DISTANCE = 80;         // 点と点を線で結ぶ投影距離の上限(px)
     var RADIUS_NEAR = 2;            // 手前の点の半径(px)
     var RADIUS_FAR = 0.6;           // 奥の点の半径(px)
     var ALPHA_NEAR = 0.9;           // 手前の点の不透明度
@@ -740,7 +754,7 @@ BACKGROUND_CANVAS_HTML = """
         ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
         centerX = width * CENTER_X_RATIO;
         centerY = height * CENTER_Y_RATIO;
-        radius = Math.min(width, height) * RADIUS_RATIO;
+        radius = Math.max(width, height) * RADIUS_RATIO;
         camera = radius * CAMERA_FACTOR;
     }
 
@@ -773,7 +787,7 @@ BACKGROUND_CANVAS_HTML = """
         // 近い点どうしを線で結ぶ（距離の判定は平方距離で行う）
         var limitSq = LINK_DISTANCE * LINK_DISTANCE;
         ctx.lineWidth = 0.6;
-        ctx.strokeStyle = 'rgba(160,190,240,0.25)';
+        ctx.strokeStyle = 'rgba(160,190,240,0.18)';
         ctx.beginPath();
         for (var a = 0; a < POINT_COUNT; a++) {
             for (var b = a + 1; b < POINT_COUNT; b++) {
