@@ -50,6 +50,22 @@ def install_stub_module(module_name):
     stub_module.__getattr__ = module_getattr
     # パッケージとしても読み込めるようにする
     stub_module.__path__ = []
+
+    if module_name == "streamlit":
+        # 「@st.cache_resource(show_spinner=False)」はモジュール読み込み時に評価されるため、
+        # 引数を受け取って関数をそのまま返すデコレータを用意する
+        def cache_resource(*args, **kwargs):
+            if len(args) == 1 and not kwargs and callable(args[0]):
+                # 「@st.cache_resource」のように引数なしで付けられた場合
+                return args[0]
+
+            def decorator(func):
+                return func
+
+            return decorator
+
+        stub_module.cache_resource = cache_resource
+
     sys.modules[module_name] = stub_module
 
     # 親モジュールがある場合、親モジュールの属性としても登録する

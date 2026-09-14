@@ -34,6 +34,10 @@ load_dotenv()
 def initialize():
     """
     画面読み込み時に実行する初期化処理
+
+    文書の読み込み〜ベクターストアの作成と各索引の構築は「load_shared_resources」に集約し、
+    サーバー内で1回だけ実行した結果を全セッションで共有する。ここでは共有物を
+    セッションへ配り、セッション固有のもの（ログ・セッションID・会話ログ・Retriever）だけを用意する。
     """
     # OPENAI_API_KEYの読み込み（st.secrets優先、無ければ.env）
     initialize_api_key()
@@ -43,18 +47,29 @@ def initialize():
     initialize_session_id()
     # ログ出力の設定
     initialize_logger()
-    # 困りごとIDとパターン文書の紐づけ一覧を作成
-    initialize_pattern_index()
-    # 業種名と業種文書の紐づけ一覧を作成
-    initialize_industry_index()
-    # 対応パターンが無い場合の検索対象（枠組み層）のファイルパス一覧を作成
-    initialize_framework_sources()
-    # 「その他」の困りごとを選んだ場合の検索対象（枠組み＋サービス）のファイルパス一覧を作成
-    initialize_other_trouble_sources()
-    # 追加質問のAgentが使う、Toolごとの検索対象ファイルパス一覧を作成
-    initialize_agent_tool_sources()
-    # RAGのRetrieverを作成
-    initialize_retriever()
+
+    # 文書の読み込み〜ベクターストアの作成と各索引（サーバー内で1回だけ作られ、全セッションで共有）
+    resources = load_shared_resources()
+
+    # 困りごとIDとパターン文書の紐づけ一覧
+    st.session_state.pattern_index = resources["pattern_index"]
+    # 業種名と業種文書の紐づけ一覧
+    st.session_state.industry_index = resources["industry_index"]
+    # 対応パターンが無い場合の検索対象（枠組み層）のファイルパス一覧
+    st.session_state.framework_sources = resources["framework_sources"]
+    # 「その他」の困りごとを選んだ場合の検索対象（枠組み＋サービス）のファイルパス一覧
+    st.session_state.other_trouble_sources = resources["other_trouble_sources"]
+    # 追加質問のAgentが使う、Toolごとの検索対象ファイルパス一覧
+    st.session_state.agent_tool_sources = resources["agent_tool_sources"]
+    # 診断時にパターン文書だけへ絞り込んだRetrieverを作れるよう、ベクターストアを保持しておく
+    st.session_state.db = resources["db"]
+
+    # ベクターストアを検索するRetrieverの作成
+    # （作成コストが軽いため、共有せずセッションごとに作る）
+    st.session_state.retriever = resources["db"].as_retriever(
+        search_type=ct.RETRIEVER_SEARCH_TYPE,
+        search_kwargs={"k": ct.RETRIEVER_TOP_K, "fetch_k": ct.RETRIEVER_FETCH_K}
+    )
 
 
 def is_running_on_cloud():
@@ -165,67 +180,6 @@ def initialize_session_id():
         st.session_state.session_id = uuid4().hex
 
 
-def initialize_pattern_index():
-    """
-    「data/パターン」配下の各ファイルの先頭メタ行を読み、
-    困りごとIDごとに紐づくパターン文書の一覧（pattern_index）を作成
-    """
-    # すでに作成済みの場合、後続の処理を中断
-    if "pattern_index" in st.session_state:
-        return
-
-    # パターン文書を格納しているフォルダのパス
-    # （ドキュメントのmetadataの「source」と同じ書式になるよう、os.path.joinで連結する）
-    pattern_folder_path = os.path.join(ct.RAG_TOP_FOLDER_PATH, ct.PATTERN_FOLDER_NAME)
-
-    # 困りごとIDをキー、パターン文書の情報リストを値とする辞書を作成
-    st.session_state.pattern_index = build_pattern_index(pattern_folder_path)
-
-
-def initialize_industry_index():
-    """
-    「data/業種」配下の各ファイルの先頭メタ行を読み、
-    業種名ごとに紐づく業種文書のファイルパス一覧（industry_index）を作成
-    """
-    # すでに作成済みの場合、後続の処理を中断
-    if "industry_index" in st.session_state:
-        return
-
-    # 業種文書を格納しているフォルダのパス
-    # （ドキュメントのmetadataの「source」と同じ書式になるよう、os.path.joinで連結する）
-    industry_folder_path = os.path.join(ct.RAG_TOP_FOLDER_PATH, ct.INDUSTRY_FOLDER_NAME)
-
-    # 業種名をキー、ファイルパスを値とする辞書を作成
-    st.session_state.industry_index = build_industry_index(industry_folder_path)
-
-
-def initialize_framework_sources():
-    """
-    対応パターンが無い困りごとの診断で検索対象とする、
-    枠組み層のファイルパス一覧（framework_sources）を作成
-
-    「data/枠組み」配下の全ファイル、「data/サービス/初期サービス案.md」、「data/解決策」配下の.mdを対象とする。
-    調査文書とパターン文書は、対応パターンが無い場合の検索対象には含めない。
-    """
-    # すでに作成済みの場合、後続の処理を中断
-    if "framework_sources" in st.session_state:
-        return
-
-    # 枠組み文書を格納しているフォルダのパス
-    # （ドキュメントのmetadataの「source」と同じ書式になるよう、os.path.joinで連結する）
-    framework_folder_path = os.path.join(ct.RAG_TOP_FOLDER_PATH, ct.FRAMEWORK_FOLDER_NAME)
-    # サービス文書のファイルパス
-    service_file_path = os.path.join(
-        ct.RAG_TOP_FOLDER_PATH, ct.SERVICE_FOLDER_NAME, ct.SERVICE_FILE_NAME
-    )
-    # 解決策文書を格納しているフォルダのパス
-    solution_folder_path = os.path.join(ct.RAG_TOP_FOLDER_PATH, ct.SOLUTION_FOLDER_NAME)
-
-    st.session_state.framework_sources = build_framework_sources(
-        framework_folder_path, service_file_path, solution_folder_path
-    )
-
-
 def build_framework_sources(framework_folder_path, service_file_path, solution_folder_path):
     """
     枠組み層のファイルパス一覧の作成
@@ -267,56 +221,6 @@ def build_framework_sources(framework_folder_path, service_file_path, solution_f
             framework_sources.append(adjust_string(full_path))
 
     return framework_sources
-
-
-def initialize_other_trouble_sources():
-    """
-    「その他」の困りごとを選んだ場合の診断で検索対象とする、
-    枠組み層＋サービス層のファイルパス一覧（other_trouble_sources）を作成
-
-    「data/枠組み」配下の全ファイル ＋ 「data/サービス」配下の全ファイルを対象とする（枠組み → サービスの順）。
-    """
-    # すでに作成済みの場合、後続の処理を中断
-    if "other_trouble_sources" in st.session_state:
-        return
-
-    # 枠組み文書を格納しているフォルダのパス
-    framework_folder_path = os.path.join(ct.RAG_TOP_FOLDER_PATH, ct.FRAMEWORK_FOLDER_NAME)
-    # サービス文書を格納しているフォルダのパス
-    service_folder_path = os.path.join(ct.RAG_TOP_FOLDER_PATH, ct.SERVICE_FOLDER_NAME)
-
-    # 既存の「build_folder_sources」を枠組み → サービスの順で呼び、結果を連結する
-    other_trouble_sources = (
-        build_folder_sources(framework_folder_path) + build_folder_sources(service_folder_path)
-    )
-
-    st.session_state.other_trouble_sources = other_trouble_sources
-
-
-def initialize_agent_tool_sources():
-    """
-    追加質問のAgentが使う、Toolごとの検索対象ファイルパス一覧（agent_tool_sources）を作成
-
-    「constants.py」の「FOLLOW_UP_TOOLS」に書いたフォルダ名を、
-    Toolの名前をキーとしたファイルパスのリストへ変換して保持する。
-    """
-    # すでに作成済みの場合、後続の処理を中断
-    if "agent_tool_sources" in st.session_state:
-        return
-
-    # Toolの名前をキー、検索対象のファイルパスのリストを値とする辞書を作成
-    agent_tool_sources = {}
-
-    for tool_info in ct.FOLLOW_UP_TOOLS:
-        tool_sources = []
-        # 1つのToolが複数のフォルダを見る場合があるため、フォルダごとに一覧を足していく
-        for folder_name in tool_info["folders"]:
-            # （ドキュメントのmetadataの「source」と同じ書式になるよう、os.path.joinで連結する）
-            folder_path = os.path.join(ct.RAG_TOP_FOLDER_PATH, folder_name)
-            tool_sources.extend(build_folder_sources(folder_path))
-        agent_tool_sources[tool_info["name"]] = tool_sources
-
-    st.session_state.agent_tool_sources = agent_tool_sources
 
 
 def build_folder_sources(folder_path):
@@ -518,17 +422,82 @@ def split_trouble_ids(value):
     return trouble_ids
 
 
-def initialize_retriever():
+@st.cache_resource(show_spinner=False)
+def load_shared_resources():
     """
-    画面読み込み時にRAGのRetriever（ベクターストアから検索するオブジェクト）を作成
+    文書の読み込み〜ベクターストアの作成と、各索引・検索対象一覧の構築
+
+    「@st.cache_resource」を付けているため、この処理はサーバー内で1回だけ実行され、
+    結果は全ブラウザセッションで共有される。セッションごとに
+    「Chroma.from_documents」を実行していた頃はセッション数ぶんベクターストアが
+    積み上がっていたが、共有によりメモリを節約できる。キャッシュはサーバーの
+    再起動（再デプロイ）で破棄され、そのとき作り直される。
+
+    進捗バーはこの関数の中に残している。Streamlitはキャッシュ命中時に
+    キャッシュ関数内のst要素を再生するが、最後の「progress_box.empty()」まで
+    再生されるため一瞬で消える。結果として「キャッシュ未作成の初回だけ進捗が見え、
+    2回目以降は即表示」になる。
+
+    Returns:
+        次のキーを持つ辞書
+        - pattern_index: 困りごとIDごとのパターン文書の一覧
+        - industry_index: 業種名ごとの業種文書のファイルパス一覧
+        - framework_sources: 対応パターンが無い場合の検索対象（枠組み層）のファイルパス一覧
+        - other_trouble_sources: 「その他」の困りごと用の検索対象（枠組み＋サービス）のファイルパス一覧
+        - agent_tool_sources: 追加質問のAgentが使う、Toolごとの検索対象ファイルパス一覧
+        - db: ベクターストア（Retrieverは含めない。セッション側で「db.as_retriever」を呼ぶ）
     """
     # ロガーを読み込むことで、後続の処理中に発生したエラーなどがログファイルに記録される
     logger = logging.getLogger(ct.LOGGER_NAME)
 
-    # すでにRetrieverが作成済みの場合、後続の処理を中断
-    if "retriever" in st.session_state:
-        return
+    ############################################################
+    # 各索引・検索対象一覧の作成
+    ############################################################
+    # パターン文書を格納しているフォルダのパス
+    # （ドキュメントのmetadataの「source」と同じ書式になるよう、os.path.joinで連結する）
+    pattern_folder_path = os.path.join(ct.RAG_TOP_FOLDER_PATH, ct.PATTERN_FOLDER_NAME)
+    # 困りごとIDをキー、パターン文書の情報リストを値とする辞書を作成
+    pattern_index = build_pattern_index(pattern_folder_path)
 
+    # 業種文書を格納しているフォルダのパス
+    industry_folder_path = os.path.join(ct.RAG_TOP_FOLDER_PATH, ct.INDUSTRY_FOLDER_NAME)
+    # 業種名をキー、ファイルパスを値とする辞書を作成
+    industry_index = build_industry_index(industry_folder_path)
+
+    # 枠組み文書を格納しているフォルダのパス
+    framework_folder_path = os.path.join(ct.RAG_TOP_FOLDER_PATH, ct.FRAMEWORK_FOLDER_NAME)
+    # サービス文書のファイルパス
+    service_file_path = os.path.join(
+        ct.RAG_TOP_FOLDER_PATH, ct.SERVICE_FOLDER_NAME, ct.SERVICE_FILE_NAME
+    )
+    # 解決策文書を格納しているフォルダのパス
+    solution_folder_path = os.path.join(ct.RAG_TOP_FOLDER_PATH, ct.SOLUTION_FOLDER_NAME)
+    # 対応パターンが無い困りごとの診断で検索対象とする、枠組み層のファイルパス一覧を作成
+    framework_sources = build_framework_sources(
+        framework_folder_path, service_file_path, solution_folder_path
+    )
+
+    # サービス文書を格納しているフォルダのパス
+    service_folder_path = os.path.join(ct.RAG_TOP_FOLDER_PATH, ct.SERVICE_FOLDER_NAME)
+    # 既存の「build_folder_sources」を枠組み → サービスの順で呼び、結果を連結する
+    other_trouble_sources = (
+        build_folder_sources(framework_folder_path) + build_folder_sources(service_folder_path)
+    )
+
+    # Toolの名前をキー、検索対象のファイルパスのリストを値とする辞書を作成
+    agent_tool_sources = {}
+    for tool_info in ct.FOLLOW_UP_TOOLS:
+        tool_sources = []
+        # 1つのToolが複数のフォルダを見る場合があるため、フォルダごとに一覧を足していく
+        for folder_name in tool_info["folders"]:
+            # （ドキュメントのmetadataの「source」と同じ書式になるよう、os.path.joinで連結する）
+            folder_path = os.path.join(ct.RAG_TOP_FOLDER_PATH, folder_name)
+            tool_sources.extend(build_folder_sources(folder_path))
+        agent_tool_sources[tool_info["name"]] = tool_sources
+
+    ############################################################
+    # 文書の読み込み〜ベクターストアの作成
+    ############################################################
     # 読み込みの進み具合を表示する場所を用意し、その中に進捗バーを置く
     # （準備が終わったら「progress_box.empty()」でまとめて消す）
     progress_box = st.empty()
@@ -578,14 +547,14 @@ def initialize_retriever():
     progress_bar.progress(100)
     progress_box.empty()
 
-    # 診断時にパターン文書だけへ絞り込んだRetrieverを作れるよう、ベクターストアを保持しておく
-    st.session_state.db = db
-
-    # ベクターストアを検索するRetrieverの作成
-    st.session_state.retriever = db.as_retriever(
-        search_type=ct.RETRIEVER_SEARCH_TYPE,
-        search_kwargs={"k": ct.RETRIEVER_TOP_K, "fetch_k": ct.RETRIEVER_FETCH_K}
-    )
+    return {
+        "pattern_index": pattern_index,
+        "industry_index": industry_index,
+        "framework_sources": framework_sources,
+        "other_trouble_sources": other_trouble_sources,
+        "agent_tool_sources": agent_tool_sources,
+        "db": db
+    }
 
 
 def initialize_session_state():
