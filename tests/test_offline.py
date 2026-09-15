@@ -6,6 +6,7 @@
 
 検証する範囲:
     1. パターン文書の先頭メタ行の解析（困りごとIDとパターン文書の紐づけ）
+    1-2. 解決策文書の先頭メタ行の解析（困りごとIDと解決策文書の紐づけ）
     2. 診断モードの検索文の組み立て
     3. 困りごとの選択肢（4領域×11件＝44件、困りごとIDの重複なし）
     4. 診断結果のOutput Parserが、サンプルのJSON文字列を変換できること
@@ -205,6 +206,75 @@ class TestPatternMeta(unittest.TestCase):
         self.assertEqual(initialize.split_trouble_ids("人事1、集客4"), ["人事1", "集客4"])
         self.assertEqual(initialize.split_trouble_ids("　人事1 ,　集客4　"), ["人事1", "集客4"])
         self.assertEqual(initialize.split_trouble_ids("人事1,"), ["人事1"])
+
+
+class TestSolutionIndex(unittest.TestCase):
+    """
+    解決策文書の先頭メタ行の解析のテスト
+
+    解決策文書は困りごとID別に1ファイルへ分かれており、領域ごとの「考え方」ファイルは
+    索引に入れない（診断時に常に検索対象へ入るため）。
+    """
+
+    @classmethod
+    def setUpClass(cls):
+        # 「data/解決策」配下のメタ行を読み、困りごとIDごとの紐づけ一覧を作成
+        cls.solution_folder_path = os.path.join(
+            APP_DIR_PATH, ct.RAG_TOP_FOLDER_PATH, ct.SOLUTION_FOLDER_NAME
+        )
+        cls.solution_index = initialize.build_solution_index(cls.solution_folder_path)
+
+    def get_file_names(self, trouble_id):
+        """
+        困りごとIDに紐づく解決策文書のファイル名の一覧を取得
+        """
+        file_names = []
+        for file_path in self.solution_index.get(trouble_id, []):
+            file_names.append(os.path.basename(file_path))
+        return file_names
+
+    def test_キー数が考え方以外のファイル数と一致する(self):
+        # 1ファイル＝1IDのため、索引のキー数はファイル数と等しくなる
+        target_count = 0
+        for file_name in os.listdir(self.solution_folder_path):
+            if os.path.splitext(file_name)[1] != ".md":
+                continue
+            if file_name.endswith(ct.SOLUTION_THINKING_FILE_SUFFIX):
+                continue
+            target_count += 1
+        self.assertEqual(len(self.solution_index), target_count)
+
+    def test_型が未確認の困りごとはキーに含まれない(self):
+        # 型が1つも書かれていない9件は、そもそもファイルを作っていない
+        # （集客6・集客10は見出しだけがあり、中身は「型1: 未確認」のため同じ扱いとする）
+        trouble_ids = [
+            "人事2", "人事3", "人事5", "人事6", "顧客9", "業務3", "業務4", "集客6", "集客10"
+        ]
+        for trouble_id in trouble_ids:
+            self.assertNotIn(trouble_id, self.solution_index)
+
+    def test_業務5は1件で解決策_業務5となる(self):
+        self.assertIn("業務5", self.solution_index)
+        self.assertEqual(self.get_file_names("業務5"), ["解決策_業務5.md"])
+
+    def test_メタ行から抜けていた集客の困りごとも本文の見出しから拾える(self):
+        # 元ファイルのメタ行には集客6・集客10が無かった。本文の見出しを正としたため、
+        # 型のある困りごと（集客1〜5, 7〜9）はすべて索引に入る
+        for trouble_id in ["集客1", "集客5", "集客9"]:
+            self.assertIn(trouble_id, self.solution_index)
+
+    def test_考え方ファイルは索引に入らない(self):
+        for file_paths in self.solution_index.values():
+            for file_path in file_paths:
+                self.assertFalse(
+                    os.path.basename(file_path).endswith(ct.SOLUTION_THINKING_FILE_SUFFIX)
+                )
+
+    def test_存在しないフォルダを渡すと空の辞書になる(self):
+        solution_index = initialize.build_solution_index(
+            os.path.join(APP_DIR_PATH, ct.RAG_TOP_FOLDER_PATH, "存在しないフォルダ")
+        )
+        self.assertEqual(solution_index, {})
 
 
 class TestIndustryIndex(unittest.TestCase):
@@ -467,11 +537,13 @@ class TestFrameworkSources(unittest.TestCase):
         for source in framework_sources:
             file_names.append(os.path.basename(source))
 
-        # 枠組み10件 → サービス1件 → 解決策4件の順で、合計15件
+        # 枠組み10件 → サービス1件 → 解決策の「考え方」4件の順で、合計15件
         self.assertEqual(len(file_names), 15)
         self.assertEqual(file_names[10], ct.SERVICE_FILE_NAME)
         for file_name in file_names[11:]:
             self.assertTrue(file_name.startswith("解決策_"))
+            # 困りごとID別の解決策ファイルは枠組み層に含めない
+            self.assertTrue(file_name.endswith(ct.SOLUTION_THINKING_FILE_SUFFIX))
         # 枠組みの範囲は名前順（01_〜10_で始まる）になっている
         self.assertEqual(sorted(file_names[:10]), file_names[:10])
         # 調査文書とパターン文書は検索対象に含めない

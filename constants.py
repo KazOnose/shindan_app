@@ -1158,6 +1158,8 @@ SERVICE_FOLDER_NAME = "サービス"
 SERVICE_FILE_NAME = "初期サービス案.md"
 # 対応パターンが無い場合の検索対象に加える解決策文書のフォルダ名（「RAG_TOP_FOLDER_PATH」の直下にある想定）
 SOLUTION_FOLDER_NAME = "解決策"
+# 領域ごとの「考え方」ファイルの末尾（困りごとID別の解決策ファイルと区別するために使う）
+SOLUTION_THINKING_FILE_SUFFIX = "_考え方.md"
 # 調査文書・記事文書のフォルダ名（「RAG_TOP_FOLDER_PATH」の直下にある想定。追加質問のAgentが検索対象にする）
 RESEARCH_FOLDER_NAME = "調査"
 ARTICLE_FOLDER_NAME = "記事"

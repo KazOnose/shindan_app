@@ -166,6 +166,10 @@ if form_input["submitted"]:
         else:
             filter_sources = list(st.session_state.framework_sources)
 
+        # 選んだ困りごとに対応する解決策文書があれば、それだけを検索対象へ加える
+        # （同じ領域の別の困りごとの型が混ざらないようにするため。無ければ枠組み層だけで一般的な目安になる）
+        filter_sources.extend(st.session_state.solution_index.get(form_input["trouble_id"], []))
+
     # 業種に対応する業種文書があれば、検索対象へ追加する
     # （業種「その他」や該当ファイルなしの場合は何もしない）
     industry_file = st.session_state.industry_index.get(form_input["industry"])

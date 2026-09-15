@@ -53,6 +53,8 @@ def initialize():
 
     # 困りごとIDとパターン文書の紐づけ一覧
     st.session_state.pattern_index = resources["pattern_index"]
+    # 困りごとIDと解決策文書の紐づけ一覧
+    st.session_state.solution_index = resources["solution_index"]
     # 業種名と業種文書の紐づけ一覧
     st.session_state.industry_index = resources["industry_index"]
     # 対応パターンが無い場合の検索対象（枠組み層）のファイルパス一覧
@@ -190,7 +192,11 @@ def build_framework_sources(framework_folder_path, service_file_path, solution_f
         solution_folder_path: 解決策文書を格納しているフォルダのパス
 
     Returns:
-        検索対象とするファイルパスのリスト（枠組み → サービス → 解決策の順）
+        検索対象とするファイルパスのリスト（枠組み → サービス → 解決策の「考え方」の順）
+
+    解決策フォルダからは領域ごとの「考え方」ファイルだけを加える。困りごとID別の
+    解決策ファイルは、別の困りごとの型が混ざらないよう、診断時に選ばれたものだけを
+    「solution_index」から加える。
     """
     framework_sources = []
 
@@ -208,7 +214,7 @@ def build_framework_sources(framework_folder_path, service_file_path, solution_f
     if os.path.isfile(service_file_path):
         framework_sources.append(adjust_string(service_file_path))
 
-    # 解決策フォルダ内の.mdを、並び順が安定するよう名前順に追加する
+    # 解決策フォルダ内の「考え方」ファイルを、並び順が安定するよう名前順に追加する
     if os.path.isdir(solution_folder_path):
         for file_name in sorted(os.listdir(solution_folder_path)):
             full_path = os.path.join(solution_folder_path, file_name)
@@ -216,6 +222,9 @@ def build_framework_sources(framework_folder_path, service_file_path, solution_f
             if os.path.isdir(full_path):
                 continue
             if os.path.splitext(file_name)[1] != ".md":
+                continue
+            # 困りごとID別の解決策ファイルは、診断時に選ばれたものだけを加えるため対象外とする
+            if not file_name.endswith(ct.SOLUTION_THINKING_FILE_SUFFIX):
                 continue
             # ドキュメントのmetadataの「source」と突き合わせるため、同じ調整を行ったパスを持つ
             framework_sources.append(adjust_string(full_path))
@@ -293,6 +302,55 @@ def build_pattern_index(pattern_folder_path):
             pattern_index.setdefault(trouble_id, []).append(pattern_info)
 
     return pattern_index
+
+
+def build_solution_index(solution_folder_path):
+    """
+    解決策文書の先頭メタ行を読み、困りごとIDごとのファイルパスの紐づけ一覧を作成
+
+    解決策文書は困りごとID別に1ファイルへ分かれている。領域ごとの「考え方」ファイルは
+    診断時に常に検索対象へ入れるため、この索引には含めない。
+
+    Args:
+        solution_folder_path: 解決策文書を格納しているフォルダのパス
+
+    Returns:
+        {困りごとID: [ファイルパス]} の辞書
+    """
+    solution_index = {}
+
+    # フォルダが存在しない場合は空の辞書を返す
+    if not os.path.isdir(solution_folder_path):
+        return solution_index
+
+    # フォルダ内のファイル名の一覧を取得（並び順を安定させるため、名前順に並べる）
+    for file_name in sorted(os.listdir(solution_folder_path)):
+        # ファイル名だけでなく、フルパスを取得
+        full_path = os.path.join(solution_folder_path, file_name)
+
+        # フォルダの場合と、Markdown以外のファイルの場合は読み込まない
+        if os.path.isdir(full_path):
+            continue
+        if os.path.splitext(file_name)[1] != ".md":
+            continue
+        # 領域ごとの「考え方」ファイルは索引に入れない
+        if file_name.endswith(ct.SOLUTION_THINKING_FILE_SUFFIX):
+            continue
+
+        # ファイルの先頭部分を読み、メタ行を解析（「困りごとID:」で始まる行の値のみ取得）
+        with open(full_path, encoding="utf-8") as f:
+            lines = f.readlines()
+
+        for line in lines[:ct.PATTERN_META_MAX_LINES]:
+            line = line.strip()
+            if line.startswith(ct.PATTERN_META_KEY_TROUBLE_IDS):
+                value = line[len(ct.PATTERN_META_KEY_TROUBLE_IDS):]
+                for trouble_id in split_trouble_ids(value):
+                    # ドキュメントのmetadataの「source」と突き合わせるため、同じ調整を行ったパスを持つ
+                    solution_index.setdefault(trouble_id, []).append(adjust_string(full_path))
+                break
+
+    return solution_index
 
 
 def build_industry_index(industry_folder_path):
@@ -441,6 +499,7 @@ def load_shared_resources():
     Returns:
         次のキーを持つ辞書
         - pattern_index: 困りごとIDごとのパターン文書の一覧
+        - solution_index: 困りごとIDごとの解決策文書のファイルパス一覧
         - industry_index: 業種名ごとの業種文書のファイルパス一覧
         - framework_sources: 対応パターンが無い場合の検索対象（枠組み層）のファイルパス一覧
         - other_trouble_sources: 「その他」の困りごと用の検索対象（枠組み＋サービス）のファイルパス一覧
@@ -459,6 +518,12 @@ def load_shared_resources():
     # 困りごとIDをキー、パターン文書の情報リストを値とする辞書を作成
     pattern_index = build_pattern_index(pattern_folder_path)
 
+    # 解決策文書を格納しているフォルダのパス
+    # （ドキュメントのmetadataの「source」と同じ書式になるよう、os.path.joinで連結する）
+    solution_folder_path = os.path.join(ct.RAG_TOP_FOLDER_PATH, ct.SOLUTION_FOLDER_NAME)
+    # 困りごとIDをキー、解決策文書のファイルパスのリストを値とする辞書を作成
+    solution_index = build_solution_index(solution_folder_path)
+
     # 業種文書を格納しているフォルダのパス
     industry_folder_path = os.path.join(ct.RAG_TOP_FOLDER_PATH, ct.INDUSTRY_FOLDER_NAME)
     # 業種名をキー、ファイルパスを値とする辞書を作成
@@ -470,8 +535,6 @@ def load_shared_resources():
     service_file_path = os.path.join(
         ct.RAG_TOP_FOLDER_PATH, ct.SERVICE_FOLDER_NAME, ct.SERVICE_FILE_NAME
     )
-    # 解決策文書を格納しているフォルダのパス
-    solution_folder_path = os.path.join(ct.RAG_TOP_FOLDER_PATH, ct.SOLUTION_FOLDER_NAME)
     # 対応パターンが無い困りごとの診断で検索対象とする、枠組み層のファイルパス一覧を作成
     framework_sources = build_framework_sources(
         framework_folder_path, service_file_path, solution_folder_path
@@ -549,6 +612,7 @@ def load_shared_resources():
 
     return {
         "pattern_index": pattern_index,
+        "solution_index": solution_index,
         "industry_index": industry_index,
         "framework_sources": framework_sources,
         "other_trouble_sources": other_trouble_sources,
