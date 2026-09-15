@@ -706,7 +706,7 @@ CUSTOM_CSS = f"""
 """
 
 # 背景の点の球（canvasアニメーション）を出すかどうか。False なら canvas を描画しない（iframe も作られない）
-SHOW_BACKGROUND_ANIMATION = True
+SHOW_BACKGROUND_ANIMATION = False
 
 # 背景の動き: 球面に散らした点をゆっくり回す canvas（components.display_background_canvas で描画）
 # ・外部ライブラリは使わず、素の <canvas> と <script> だけで完結させる
