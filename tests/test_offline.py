@@ -244,24 +244,29 @@ class TestSolutionIndex(unittest.TestCase):
             target_count += 1
         self.assertEqual(len(self.solution_index), target_count)
 
-    def test_型が未確認の困りごとはキーに含まれない(self):
-        # 型が1つも書かれていない9件は、そもそもファイルを作っていない
-        # （集客6・集客10は見出しだけがあり、中身は「型1: 未確認」のため同じ扱いとする）
-        trouble_ids = [
-            "人事2", "人事3", "人事5", "人事6", "顧客9", "業務3", "業務4", "集客6", "集客10"
-        ]
-        for trouble_id in trouble_ids:
-            self.assertNotIn(trouble_id, self.solution_index)
+    def test_その他を除くすべての困りごとにキーがある(self):
+        # 画面の選択肢にある困りごとは、「その他」を除いてすべて解決策文書を持つ
+        # （「その他」は困りごとが決まっていないため、枠組み層とサービスだけで診断する）
+        for items in ct.TROUBLE_OPTIONS.values():
+            for trouble_id, trouble_text in items:
+                if utils.is_other_trouble(trouble_id):
+                    self.assertNotIn(trouble_id, self.solution_index)
+                else:
+                    self.assertIn(trouble_id, self.solution_index)
+
+    def test_困りごとIDごとの解決策文書は1件ずつになる(self):
+        # 1ファイル＝1IDのため、どのキーもファイルは1件だけになる
+        for trouble_id, file_paths in self.solution_index.items():
+            self.assertEqual(len(file_paths), 1, trouble_id)
 
     def test_業務5は1件で解決策_業務5となる(self):
         self.assertIn("業務5", self.solution_index)
         self.assertEqual(self.get_file_names("業務5"), ["解決策_業務5.md"])
 
     def test_メタ行から抜けていた集客の困りごとも本文の見出しから拾える(self):
-        # 元ファイルのメタ行には集客6・集客10が無かった。本文の見出しを正としたため、
-        # 型のある困りごと（集客1〜5, 7〜9）はすべて索引に入る
-        for trouble_id in ["集客1", "集客5", "集客9"]:
-            self.assertIn(trouble_id, self.solution_index)
+        # 元ファイルのメタ行には集客6・集客10が無かったが、本文の見出しを正としたため索引に入る
+        self.assertEqual(self.get_file_names("集客6"), ["解決策_集客6.md"])
+        self.assertEqual(self.get_file_names("集客10"), ["解決策_集客10.md"])
 
     def test_考え方ファイルは索引に入らない(self):
         for file_paths in self.solution_index.values():
